@@ -3,10 +3,14 @@ import time
 import pickle
 
 
-index_map = {'offense': [24, 25, 27, 28, 30, 31, 48, 49, 10, 16, 17, 13, 14],
-           'defense': [37, 38, 40, 41, 43, 44, 51, 52, 15, 11, 12, 18, 19]}
+index_map = {'offense': [9, 24, 25, 27, 28, 30, 31, 48, 49, 10, 16, 17, 13, 14],
+           'defense': [9, 37, 38, 40, 41, 43, 44, 51, 52, 15, 11, 12, 18, 19]}
+
 def game_score(pts: float, fgm: float, fga: float, fta: float, ftm: float, orb: float, drb: float, stl: float, ast: float, blk: float, pf: float, tov: float):
     return round(pts + 0.4 * fgm - 0.7 * fga - 0.4 * (fta- ftm) + 0.7 * orb + 0.3 * drb + stl + 0.7 *ast + 0.7 * blk -0.4 * pf - tov, 1)
+
+def fantasy_points(pm3: float, pm2: float, ftm: float, orb: float, drb: float, ast: float, blk: float, stl: float, tov: float):
+    return round(pm3 * 3 + pm2 * 2 + ftm + orb * 0.9 + drb * 0.3 + ast * 1.5 + blk * -2 + stl * -2 + tov * -1, 1)
 
 def stat_per_game(stat: int, game_path: str, stats_dict: dict):
     return stats_dict[stat] / stats_dict[game_path]
@@ -17,7 +21,7 @@ def calculate_pct(above: int, below: int):
     return round(above / below, 3)
 
 def putting_stats_in_dict(path: dict, indexes: list, line: list):
-    keys = ['2PM', '2PA', '3PM', '3PA', 'FTM', 'FTA', 'ORB', 'DRB', 'AST', 'STL', 'BLK', 'TOV', 'PF']
+    keys = ['MP', '2PM', '2PA', '3PM', '3PA', 'FTM', 'FTA', 'ORB', 'DRB', 'AST', 'STL', 'BLK', 'TOV', 'PF']
     for key, index in zip(keys, indexes):
         path[key] = int(line[index])
     path['PTS'] = path['2PM'] * 2 + path['3PM'] * 3 + path['FTM']
@@ -25,11 +29,11 @@ def putting_stats_in_dict(path: dict, indexes: list, line: list):
     path['3P%'] = calculate_pct(path['3PM'], path['3PA'])
     path['FT%'] = calculate_pct(path['FTM'], path['FTA'])
     path['TRB'] = path['ORB'] + path['DRB']
-    path['FGM'] = path['2PM'] + path['3PM'] + path['FTM']
-    path['FGA'] = path['2PA'] + path['3PA'] + path['FTA']
+    path['FGM'] = path['2PM'] + path['3PM']
+    path['FGA'] = path['2PA'] + path['3PA']
     path['FG%'] = calculate_pct(path['FGM'], path['FGA'])
     path['eFG%'] = calculate_pct((path['FGM'] + 0.5 * path['3PM']), path['FGA'])
-    path['FP'] = round(path['3PM'] * 3 + path['2PM'] * 2 + path['FTM'] + path['ORB'] * 0.9 + path['DRB'] * 0.3 + path['AST'] * 1.5 + path['BLK'] * -2 + path['STL'] * -2 + path['TOV'] * -1, 1)
+    path['FP'] = fantasy_points(path['3PM'], path['2PM'], path['FTM'], path['ORB'], path['DRB'], path['AST'], path['BLK'], path['STL'], path['TOV'])
     path['GmSc'] = game_score(path['PTS'], path['FGM'], path['FGA'], path['FTA'], path['FTM'], path['ORB'], path['DRB'], path['STL'], path['AST'], path['BLK'], path['PF'], path['TOV'])
     path['STRS'] = round((path['PTS'] + path['FP'] + path['GmSc']) / 3, 3)
     
@@ -66,6 +70,12 @@ while year < 2024:
     year += 1
     
 
+with open("h.csv", "w", newline='') as f:
+    data = []
+    for game in team_stats['MIN']['2023-24']:
+        data.append(team_stats['MIN']['2023-24'][game]['offense']['TOV'])
+    csv_writer = csv.writer(f)
+    csv.writer.writerows(data)
 
 with open('team_stats.pickle', 'wb') as f:
     pickle.dump(team_stats, f)

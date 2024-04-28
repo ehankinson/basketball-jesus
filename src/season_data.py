@@ -1,6 +1,6 @@
 import time
 import pickle
-
+from advanced_stats import calculate_player_advanced_stats
 
 nba_teams = {
     "ATL": "Atlanta Hawks",
@@ -81,7 +81,10 @@ teams_list = {
     }
 
 def game_score(pts: float, fgm: float, fga: float, fta: float, ftm: float, orb: float, drb: float, stl: float, ast: float, blk: float, pf: float, tov: float):
-    return round(pts + 0.4 * fgm - 0.7 * fga - 0.4 * (fta- ftm) + 0.7 * orb + 0.3 * drb + stl + 0.7 *ast + 0.7 * blk -0.4 * pf - tov, 1)
+    return round(pts + 0.4 * fgm - 0.7 * fga - 0.4 * (fta- ftm) + 0.7 * orb + 0.3 * drb + stl + 0.7 *ast + 0.7 * blk -0.4 * pf - tov, 3)
+
+def fantasy_points(pm3: float, pm2: float, ftm: float, orb: float, drb: float, ast: float, blk: float, stl: float, tov: float):
+    return round(pm3 * 3 + pm2 * 2 + ftm + orb * 0.9 + drb * 0.3 + ast * 1.5 + blk * -2 + stl * -2 + tov * -1, 1)
 
 def stat_per_game(stat: int, game_path: str, stats_dict: dict):
     return stats_dict[stat] / stats_dict[game_path]
@@ -121,7 +124,6 @@ def team_record(team: str, year: str, league_type: str, end_game: int, start_gam
         calculating_record(league_type, team_stats, year, game, record, team)
     return record
 
-
 def season_ranking(year: str, end_game: int, start_game = 1):
     season_records = {}
     with open("team_stats.pickle", "rb") as f:
@@ -147,18 +149,18 @@ def rank_teams(teams: list, year: str, league_type: str, end_game: int, start_ga
         team.insert(0, seed + 1)
     return sorted_records
 
-def calculating_regular_stats(year_stats: dict, game: int, type: str, season_stats: dict):
-    for stat in year_stats[game][type]:
+def calculating_regular_stats(year_stats: dict, game: int, side_of_ball: str, season_stats: dict):
+    for stat in year_stats[game][side_of_ball]:
         if stat == 'OPP':
             continue
         if stat not in season_stats:
-            season_stats[stat] = year_stats[game][type][stat]
+            season_stats[stat] = year_stats[game][side_of_ball][stat]
             continue
-        season_stats[stat] += year_stats[game][type][stat]
+        season_stats[stat] += year_stats[game][side_of_ball][stat]
 
-def stats_per_league_type(league_type, year_stats, game, type, season_stats):
+def stats_per_league_type(league_type, year_stats, game, side_of_ball, season_stats):
     if league_type == '0.0':
-        calculating_regular_stats(year_stats, game, type, season_stats)
+        calculating_regular_stats(year_stats, game, side_of_ball, season_stats)
     elif league_type == '0.1':
         if type == 'offense':
             new_type = 'defense'
@@ -166,7 +168,7 @@ def stats_per_league_type(league_type, year_stats, game, type, season_stats):
             new_type = 'offense'
         calculating_regular_stats(year_stats, game, new_type, season_stats)
 
-def season_stats(team: str, year: str, league_type: str, type: str, end_game: int, start_game = 1):
+def season_stats(team: str, year: str, league_type: str, side_of_ball: str, end_game: int, start_game = 1):
     season_stats = {}
     season_stats['GP'] = 0
     with open("team_stats.pickle", "rb") as f:
@@ -178,13 +180,13 @@ def season_stats(team: str, year: str, league_type: str, type: str, end_game: in
             if game not in year_stats:
                 continue
             season_stats['GP'] += 1
-            stats_per_league_type(league_type, year_stats, game, type, season_stats)
+            stats_per_league_type(league_type, year_stats, game, side_of_ball, season_stats)
     season_stats['2P%'] = round(season_stats['2PM'] / season_stats['2PA'], 3)
     season_stats['3P%'] = round(season_stats['3PM'] / season_stats['3PA'], 3)
     season_stats['FT%'] = round(season_stats['FTM'] / season_stats['FTA'], 3)
     season_stats['TRB'] = season_stats['ORB'] + season_stats['DRB']
-    season_stats['FGM'] = season_stats['2PM'] + season_stats['3PM'] + season_stats['FTM']
-    season_stats['FGA'] = season_stats['2PA'] + season_stats['3PA'] + season_stats['FTA']
+    season_stats['FGM'] = season_stats['2PM'] + season_stats['3PM']
+    season_stats['FGA'] = season_stats['2PA'] + season_stats['3PA']
     season_stats['FG%'] = round(season_stats['FGM'] / season_stats['FGA'], 3)
     season_stats['eFG%'] = round((season_stats['FGM'] + 0.5 * season_stats['3PM']) / season_stats['FGA'], 3)
     season_stats['FP'] = round(season_stats['3PM'] * 3 + season_stats['2PM'] * 2 + season_stats['FTM'] + season_stats['ORB'] * 0.9 + season_stats['DRB'] * 0.3 + season_stats['AST'] * 1.5 + season_stats['BLK'] * -2 + season_stats['STL'] * -2 + season_stats['TOV'] * -1, 1)
@@ -192,21 +194,18 @@ def season_stats(team: str, year: str, league_type: str, type: str, end_game: in
     season_stats['STRS'] = round((stat_per_game('PTS', 'GP', season_stats) + stat_per_game('FP', 'GP', season_stats) + season_stats['GmSc']) / 3, 3)
     return season_stats
 
-
 #----------------------------------------------------------------
 # Power Ranking Calculations
 def power_rankings(teams: list, year: str, league_type: str, end_game: int, start_game = 1):
     with open("team_stats.pickle", "rb") as f:
         opened = True
         league_stats = pickle.load(f)
-        total_start = time.time()
         if league_type == '0.0':
             power_list = power_rankigns_00(teams, year, league_type, end_game, start_game, league_stats)
         elif league_type == '0.1':
             power_list = power_rankings_01(teams, year, league_type, end_game, start_game, opened, league_stats)
         elif league_type == '1.0':
             power_list = power_rankings_10(teams, year, league_type, end_game, start_game, league_stats)
-    print(f"The total time was {time.time() - total_start}")
     return_list = sorted(power_list, key=lambda x: x[6], reverse=True)
     for rank, team in enumerate(return_list):
         team.insert(0, rank + 1)
@@ -406,18 +405,83 @@ def power_rankings_10(teams: list, year: str, league_type: str, end_game:int, st
 
 #----------------------------------------------------------------
 # Player Ranking Calculations
-def player_rankings(year: str, end_game: int, start_game = 1):
-    player_stats = []
+def player_rankings(teams: list, year: str, league_type: str, end_game: int, start_game = 1):
+    start_time = time.time()
+    player_list = []
     with open("player_data.pickle", "rb") as f:
         league_data = pickle.load(f)
+    with open("player_pos.pickle", "rb") as f:
+        pos_data = pickle.load(f)
+        pos_data = pos_data[year]
     for player in league_data:
-        player_dict = {}
-        player_stats = league_data[player][year]
-    a = 5
+        player_list.append(player_season_stats(player, year, league_type, end_game, start_game, teams, league_data, pos_data))
+    sorted_list = sorted(player_list, key=lambda x: x[32], reverse=True)
+    game_min = len(range(start_game, end_game + 1)) * 0.4
+    min_minute = game_min * 15
+    final_list = []
+    for player in sorted_list:
+        if player[3] >= game_min:
+            if player[4] * game_min > min_minute:
+                final_list.append(player)
+    end_time = time.time()
+    print(f"it took {end_time - start_time} seconds to run")
+    return final_list
+
+def player_season_stats(player: str, year: str, league_type: str, end_game: int, start_game = 1, teams = None, league_data = None, pos_data = None):
+    if league_data == None:
+        with open("player_data.pickle", "rb") as f:
+            league_data = pickle.load(f)
+        with open("player_pos.pickle", "rb") as f:
+            pos_data = pickle.load(f)
+            pos_data = pos_data[year]
+    player_dict = {}
+    league_player_data = league_data[player][year]
+    if teams == None:
+        teams = league_player_data.keys()
+    for team in league_player_data:
+        if team in teams:
+            player_stats = league_player_data[team]
+            for game in range(start_game, end_game + 1):
+                if game not in player_stats:
+                    continue
+                for stat in player_stats[game]:
+                    if stat not in player_dict:
+                        player_dict[stat] = player_stats[game][stat]
+                        continue
+                    player_dict[stat] += player_stats[game][stat]
+                if 'GP' not in player_dict:
+                    player_dict['GP'] = 1
+                    continue
+                player_dict['GP'] += 1
+        break
+    fg_pct = calculate_pct(player_dict['FGM'], player_dict['FGA'])
+    pct_2p = calculate_pct(player_dict['2PM'], player_dict['2PA'])
+    pct_3p = calculate_pct(player_dict['3PM'], player_dict['3PA'])
+    ft_pct = calculate_pct(player_dict['FTM'], player_dict['FTA'])
+    eFG = calculate_pct((player_dict['FGM'] + 0.5 * player_dict['3PM']), player_dict['FGA'])
+    trb = (player_dict['ORB'] + player_dict['DRB']) / player_dict['GP']
+    player_dict_per_game = {}
+    for stat in player_dict:
+        if stat == 'GP':
+            continue
+        player_dict_per_game[stat] = player_dict[stat] / player_dict['GP']
+    off_stats = season_stats(team, year, league_type, 'offense', end_game, start_game)
+    def_stats = season_stats(team, year, league_type, 'defense', end_game, start_game)
+    advanced_stats = calculate_player_advanced_stats(player_dict, off_stats, def_stats)
+    for stat in advanced_stats:
+        player_dict_per_game[stat] = advanced_stats[stat]
+    for pos in pos_data:
+        if player in pos_data[pos]:
+            break
+    fp = fantasy_points(player_dict_per_game['3PM'], player_dict_per_game['2PM'], player_dict_per_game['FTM'], player_dict_per_game['ORB'], player_dict_per_game['DRB'], player_dict_per_game['AST'], player_dict_per_game['BLK'], player_dict_per_game['STL'], player_dict_per_game['TOV'])
+    gmsc = game_score(player_dict_per_game['PTS'], player_dict_per_game['FGM'], player_dict_per_game['FGA'], player_dict_per_game['FTA'], player_dict_per_game['FTM'], player_dict_per_game['ORB'], player_dict_per_game['DRB'], player_dict_per_game['STL'], player_dict_per_game['AST'], player_dict_per_game['BLK'], player_dict_per_game['PF'], player_dict_per_game['TOV'])
+    spr = round((fp * 0.15 + gmsc * 0.45 + player_dict_per_game['nRtg'] * 0.4), 3)
+    return [player, year, pos, player_dict['GP'], round(player_dict_per_game['MP'], 1), round(player_dict_per_game['PTS'], 1), round(player_dict_per_game['FGM'], 1), round(player_dict_per_game['FGA'], 1), round(fg_pct, 3), round(eFG, 3), round(player_dict_per_game['2PM'], 1), round(player_dict_per_game['2PA'], 1), round(pct_2p, 3), round(player_dict_per_game['3PM'], 1), round(player_dict_per_game['3PA'], 1), round(pct_3p, 3), round(player_dict_per_game['FTM'], 1), round(player_dict_per_game['FTA'], 1), round(ft_pct, 3), round(player_dict_per_game['ORB'], 1), round(player_dict_per_game['DRB'], 1), round(trb, 1), round(player_dict_per_game['AST'], 1), round(player_dict_per_game['STL'], 1), round(player_dict_per_game['BLK'], 1), round(player_dict_per_game['TOV'], 1), round(player_dict_per_game['PF'], 1), round(player_dict_per_game['oRtg'], 1), round(player_dict_per_game['dRtg'], 1), round(player_dict_per_game['nRtg'], 1), fp, gmsc, spr]
 
 
-# teams = ['GSW', 'ATL', 'BOS', 'BRK', 'CHO', 'CHI', 'CLE', 'DAL', 'DEN', 'DET', 'HOU', 'IND', 'LAC', 'LAL', 'MEM', 'MIA', 'MIL', 'MIN', 'NOP', 'NYK', 'OKC', 'ORL', 'PHI', 'PHO', 'POR', 'SAC', 'SAS', 'TOR', 'UTA', 'WAS']
+teams = ['GSW', 'ATL', 'BOS', 'BRK', 'CHO', 'CHI', 'CLE', 'DAL', 'DEN', 'DET', 'HOU', 'IND', 'LAC', 'LAL', 'MEM', 'MIA', 'MIL', 'MIN', 'NOP', 'NYK', 'OKC', 'ORL', 'PHI', 'PHO', 'POR', 'SAC', 'SAS', 'TOR', 'UTA', 'WAS']
 # # # for team in teams: 
-a = player_rankings('2023-24', 82)
+a = player_rankings(teams, '2023-24', '0.0', 82)
+# a = player_season_stats('Trae Young', '2023-24', '0.0', 82)
 # # a = rank_teams(teams, '2020-21', '0.0', 73, 1)
 print(a)
