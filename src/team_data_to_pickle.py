@@ -86,10 +86,14 @@ def advanced_stats(path: dict):
     path['STRS'] = round((path['PTS'] + path['FP'] + path['GmSc']) / 3, 3)
     
 def process_team_data(reading_file: list, team_stats: dict):
+    playoff_round = ['round1', 'conf_semi', 'conf_final', 'finals']
+    playoff_teams = {}
     for line in reading_file:
         if line[1] == 'Team':
             continue
         team = line[1]
+        if team == 'PHI':
+            a = 5
         if team not in team_stats:
             team_stats[team] = {}
         game = len(team_stats[team]) + 1
@@ -101,7 +105,22 @@ def process_team_data(reading_file: list, team_stats: dict):
         #defense
         team_stats[team][game]['defense'] = {}
         putting_stats_in_dict(team_stats[team][game]['defense'], index_map['defense'], line)
+        #opponant
         team_stats[team][game]['opp'] = line[7]
+        if len(team_stats[team]) <= 82:
+            team_stats[team][game]['game_type'] = 'regular_season'
+        else:
+            if team not in playoff_teams:
+                playoff_teams[team] = {'wins': 0, 'losses': 0, 'round_count': 0}
+            if playoff_teams[team]['wins'] == 4 or playoff_teams[team]['losses'] == 4:
+                playoff_teams[team]['round_count'] += 1
+                playoff_teams[team]['wins'] = 0
+                playoff_teams[team]['losses'] = 0
+            team_stats[team][game]['game_type'] = {'playoffs', playoff_round[playoff_teams[team]['round_count']]}
+            if line[8][0] == 'W':
+                playoff_teams[team]['wins'] += 1
+            else:
+                playoff_teams[team]['losses'] += 1
 
 def greater_than(off_stats: dict, def_stats: dict):
     stats = ['2PM', '2PA', '3PM', '3PA', 'FTM', 'FTA', 'ORB', 'DRB', 'AST', 'STL', 'BLK', 'TOV', 'PF']
@@ -178,6 +197,7 @@ def make_01_pickle(year: int):
                 new_league_data[team][game]['offense'] = league_data[team][game]['defense']
                 new_league_data[team][game]['defense'] = league_data[team][game]['offense']
                 new_league_data[team][game]['opp'] = league_data[team][game]['opp']
+                new_league_data[team][game]['game_type'] = league_data[team][game]['game_type']
         else:
             for game in range(1, end_game):
                 if game not in league_data[new_team]:
@@ -195,10 +215,12 @@ def make_01_pickle(year: int):
                     seed = (15 - teams.index(opp))
                     new_opp = teams[seed - 1]
                     new_league_data[team][game]['opp'] = new_opp
+                    new_league_data[team][game]['game_type'] = league_data[new_team][game]['game_type']
                 else:
                     new_league_data[team][game]['offense'] = league_data[team][game]['defense']
                     new_league_data[team][game]['defense'] = league_data[team][game]['offense']
                     new_league_data[team][game]['opp'] = league_data[team][game]['opp']
+                    new_league_data[team][game]['game_type'] = league_data[team][game]['game_type']
     with open(f"./data/pickle/{year}-{int(str(year)[2:]) + 1} NBA Team Stats 01.pickle", "wb") as pk:
         pickle.dump(new_league_data, pk)
 
@@ -214,12 +236,12 @@ def make_10_pickle(year: int):
                 new_off, new_def = greater_than(league_data[team][game]['offense'], league_data[team][game]['defense'])
                 new_league_data[team][game]['offense'] = new_off
                 new_league_data[team][game]['defense'] = new_def
-                new_league_data[team][game]['opp'] = league_data[team][game]['opp']
             else:
                 new_off, new_def = lower_than(league_data[team][game]['offense'], league_data[team][game]['defense'])
                 new_league_data[team][game]['offense'] = new_off
                 new_league_data[team][game]['defense'] = new_def
-                new_league_data[team][game]['opp'] = league_data[team][game]['opp']
+            new_league_data[team][game]['opp'] = league_data[team][game]['opp']
+            new_league_data[team][game]['game_type'] = league_data[team][game]['game_type']
     with open(f"./data/pickle/{year}-{int(str(year)[2:]) + 1} NBA Team Stats 10.pickle", "wb") as pk:
         pickle.dump(new_league_data, pk)
 
@@ -235,12 +257,12 @@ def make_11_pickle(year: int):
                 new_off, new_def = greater_than(league_data[team][game]['offense'], league_data[team][game]['defense'])
                 new_league_data[team][game]['offense'] = new_off
                 new_league_data[team][game]['defense'] = new_def
-                new_league_data[team][game]['opp'] = league_data[team][game]['opp']
             else:
                 new_off, new_def = lower_than(league_data[team][game]['offense'], league_data[team][game]['defense'])
                 new_league_data[team][game]['offense'] = new_off
                 new_league_data[team][game]['defense'] = new_def
-                new_league_data[team][game]['opp'] = league_data[team][game]['opp']
+            new_league_data[team][game]['opp'] = league_data[team][game]['opp']
+            new_league_data[team][game]['game_type'] = league_data[team][game]['game_type']
     with open(f"./data/pickle/{year}-{int(str(year)[2:]) + 1} NBA Team Stats 11.pickle", "wb") as pk:
         pickle.dump(new_league_data, pk)
 
@@ -248,6 +270,8 @@ def make_20_pickle(year: int):
     with open(f"./data/pickle/{year}-{int(str(year)[2:]) + 1} NBA Team Stats 10.pickle", "rb") as f:
         league_data = pickle.load(f)
     ranked_teams = rank_teams(teams_dict['League'], league_data, 82, 1)
+    east_rank = rank_teams(teams_dict['Eastern'], league_data, 82, 1)
+    west_rank = rank_teams(teams_dict['Western'], league_data, 82, 1)
     new_league_data = {}
     if year == 2021:
         end_game = 72
@@ -287,12 +311,54 @@ def rank_teams(teams: list, league_data: dict, end_game: int, start_game: int):
         record['win%'] = record['wins'] / record['gp']
         record['diff'] = round((record['pf'] - record['pa']) / record['gp'], 3)
         ranked_teams.append([team, record['gp'], record['wins'], record['losses'], round(record['win%'], 3), round(record['pf'] / record['gp'], 1), round(record['pa'] / record['gp'], 1), record['diff']])
-    ranked_teams = sorted(ranked_teams, key=lambda x: x[4], reverse=True)
+    sorted_teams = sorted(ranked_teams, key=lambda x: x[4], reverse=True)
+    ranked_teams = ranking_teams(sorted_teams, league_data, end_game, start_game)
     return_list = [team[0] for team in ranked_teams]
     return return_list
 
+def ranking_teams(teams: list, league_data: dict, end_game: int, start_game = 1) -> list:
+    ranked_list = []
+    for count, team in enumerate(teams):
+        if count + 1 == len(teams):
+            ranked_list.append(team)
+            break
+        compare_team = teams[count + 1]
+        if team[4] > compare_team[4]:
+            ranked_list.append(team)
+            continue
+        else:
+            if team[4] == teams[count + 2][4]:
+                multi_teams = []
+                for i in range(count, len(teams) + 1):
+                    if teams[count][4] == team[4]:
+                        multi_teams.append(team[count][0])
+            else:
+                h2h = head2head(league_data[team[0]], compare_team[0], end_game, start_game)
+                if h2h == 0:
+                    ranked_list.append(team)
+                elif h2h == 1:
+                    ranked_list.append(teams[count + 1])
+                    teams[count + 1] = team
+                else:
+                    a = 5
+                    #check div winner
 
 
+
+def head2head(team1_stats: dict, team2: str, end_game: int, start_game = 1):
+    record = {'wins': 0, 'losses': 0}
+    for game in range(start_game, end_game + 1):
+        if team1_stats[game]['opp'] == team2:
+            if team1_stats[game]['offense']['PTS'] > team1_stats[game]['defense']['PTS']:
+                record['wins'] += 1
+            else:
+                record['losses'] += 1
+    if record['wins'] > record['losses']:
+        return 0
+    elif record['wins'] == record['losses']:
+        return 'continue'
+    else:
+        return 1
 
 function_map = {
     '0.0': make_00_pickle,
