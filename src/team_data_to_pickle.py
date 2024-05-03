@@ -329,10 +329,12 @@ def ranking_teams(teams: list, league_data: dict, end_game: int, start_game = 1)
         else:
             if team[4] == teams[count + 2][4]:
                 multi_teams = []
-                for i in range(count, len(teams) + 1):
+                for _ in range(count, len(teams) + 1):
                     if teams[count][4] == team[4]:
                         multi_teams.append(team[count][0])
             else:
+                team1 = team[0]
+                team2 = compare_team[0]
                 h2h = head2head(league_data[team[0]], compare_team[0], end_game, start_game)
                 if h2h == 0:
                     ranked_list.append(team)
@@ -340,10 +342,75 @@ def ranking_teams(teams: list, league_data: dict, end_game: int, start_game = 1)
                     ranked_list.append(teams[count + 1])
                     teams[count + 1] = team
                 else:
-                    a = 5
-                    #check div winner
+                    div_winner = check_if_div_winner(team1, team2, league_data, end_game, start_game)
+                    if div_winner == 0:
+                        ranked_list.append(team)
+                    elif div_winner == 1:
+                        ranked_list.append(teams[count + 1])
+                        teams[count + 1] = team
+                    else:
+                        if div_winner[0] == div_winner[1]:
+                            a = 6
+                            #check division record
+                        conf_check = conf_win_pct(team1, team2, league_data, end_game, start_game)
+                        if conf_check == 0:
+                            ranked_list.append(team)
+                        elif conf_check == 1:
+                            ranked_list.append(teams[count + 1])
+                            teams[count + 1] = team
+                        else:
+                            a = 5  
+                    
+    return ranked_list
 
+def conf_win_pct(team1: str, team2: str, league_data: dict, end_game: int, start_game: int):
+    team1_record = [0, 0]
+    team2_record = [0, 0]
+    if team1 in teams_dict['Eastern']:
+        teams = teams_dict['Eastern']
+    else:
+        teams = teams_dict['Western']
+    for game in range(start_game, end_game + 1):
+        # checking for team1
+        if league_data[team1][game]['opp'] in teams:
+            if league_data[team1][game]['offense']['PTS'] > league_data[team1][game]['defense']['PTS']:
+                team1_record[0] += 1
+            else:
+                team1_record[1] += 1
+        #checking for team2
+        if league_data[team2][game]['opp'] in teams:
+            if league_data[team2][game]['offense']['PTS'] > league_data[team2][game]['defense']['PTS']:
+                team2_record[0] += 1
+            else:
+                team2_record[1] += 1
+    team1_record.append(team1_record[0] / (team1_record[0] + team1_record[1]))
+    team2_record.append(team2_record[0] / (team2_record[0] + team2_record[1]))
+    if team1_record[2] > team2_record[2]:
+        return 0
+    elif team1_record[2] < team2_record[2]:
+        return 1
+    else:
+        'continue'
 
+    
+
+def check_if_div_winner(team1: str, team2: str, league_data: dict, end_game: int, start_game: int):
+    divisions = ['Atlantic', 'Central', 'Southeast', 'Northwest', 'Pacific', 'Southwest']
+    for division in divisions:
+        if team1 in teams_dict[division]:
+            team1_div_rank = rank_teams(teams_dict[division], league_data, end_game, start_game)
+            team1_div = division
+        if team2 in teams_dict[division]:
+            team2_div_rank = rank_teams(teams_dict[division], league_data, end_game, start_game)
+            team2_div = division
+    team1_seed = team1_div_rank.index(team1)
+    team2_seed = team2_div_rank.index(team2)
+    if team1_seed == 1 and team2_seed != 1:
+        return 0
+    elif team1_seed != 1 and team2_seed == 1:
+        return 1
+    else:
+        return [team1_div, team2_div]
 
 def head2head(team1_stats: dict, team2: str, end_game: int, start_game = 1):
     record = {'wins': 0, 'losses': 0}
