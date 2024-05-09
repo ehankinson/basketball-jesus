@@ -117,7 +117,7 @@ def process_team_data(reading_file: list, team_stats: dict):
                 playoff_teams[team]['round_count'] += 1
                 playoff_teams[team]['wins'] = 0
                 playoff_teams[team]['losses'] = 0
-            team_stats[team][game]['game_type'] = {'playoffs', playoff_round[playoff_teams[team]['round_count']]}
+            team_stats[team][game]['game_type'] = {'playoffs': playoff_round[playoff_teams[team]['round_count']]}
             if line[8][0] == 'W':
                 playoff_teams[team]['wins'] += 1
             else:
@@ -164,26 +164,28 @@ def lower_than(off_stats: dict, def_stats: dict):
 def make_00_pickle(year: int):
     with open("2023-24 NBA Team Stats.pickle", "rb") as pk:
         league_stats = pickle.load(pk)
-    srs_ranking(teams_dict['League'], league_stats, 82, 1)
     with open(f"./data/pickle/{year}-{int(str(year)[2:]) + 1} NBA Team Stats 00.pickle", "wb") as pk:
         pickle.dump(league_stats, pk)
 
 def make_01_pickle(year: int):
     with open(f"./data/pickle/{year}-{int(str(year)[2:]) + 1} NBA Team Stats 00.pickle", "rb") as f:
         league_data = pickle.load(f)
-    if year != 2021:
+    if year != 2020:
         end_game = 82
         start_game = 1
-    eastern_teams = teams_dict['Eastern']
-    western_teams = teams_dict['Western']
-    eastern_ranks = rank_teams(eastern_teams, 'Conf', league_data, end_game, start_game)
-    western_ranks = rank_teams(western_teams, 'Conf', league_data, end_game, start_game)
+    else:
+        end_game = 72
+        start_game = 1
+    with open(f"./data/pickle/{year}-{int(str(year)[2:]) + 1} NBA Standings.pickle", "rb") as f:
+        standings = pickle.load(f)
+    eastern_ranks = standings['East']
+    western_ranks = standings['West']
     new_league_data = {}
     for team in league_data:
-        if team in western_teams:
-            teams = western_ranks
-        else:
+        if team in eastern_ranks:
             teams = eastern_ranks
+        else:
+            teams = western_ranks
         seed = (15 - teams.index(team))
         new_team = teams[seed - 1]
         new_league_data[team] = {}
@@ -272,8 +274,11 @@ def make_20_pickle(year: int):
     with open(f"./data/pickle/{year}-{int(str(year)[2:]) + 1} NBA Team Stats 10.pickle", "rb") as f:
         league_data = pickle.load(f)
     ranked_teams = srs_ranking(teams_dict['League'], league_data, 82, 1)
-    east_rank = rank_teams(teams_dict['Eastern'], 'League', league_data, 82, 1)
-    west_rank = rank_teams(teams_dict['Western'], 'League', league_data, 82, 1)
+    ranked_teams = [team[0] for team in ranked_teams]
+    with open(f"./data/pickle/{year}-{int(str(year)[2:]) + 1} NBA Team Stats 00.pickle", "rb") as f:
+        standings = pickle.load(f)
+    east_rank = standings['East']
+    west_rank = standings['West']
     new_league_data = {}
     if year == 2021:
         end_game = 72
@@ -295,8 +300,199 @@ def make_20_pickle(year: int):
                 new_league_data[team][game]['offense'] = new_off
                 new_league_data[team][game]['defense'] = new_def
                 new_league_data[team][game]['opp'] = league_data[team][game]['opp']
-    new_ranked_teams = rank_teams(teams_dict['League'], new_league_data, 82, 1)
-    a = 5
+    new_east_rank = rank_teams(teams_dict['Eastern'], 'conf', new_league_data, 82, 1)
+    new_west_rank = rank_teams(teams_dict['Western'], 'conf', new_league_data, 82, 1)
+    playoff_games = {}
+    for team in league_data:
+        if len(league_data[team]) < 83:
+            continue
+        if team in east_rank:
+            team_conf = 'East'
+            conf_to_comapare = east_rank
+        else:
+            team_conf = 'West'
+            conf_to_comapare = west_rank
+        did_conf_count = False
+        did_final_count = False
+        game_count = 1
+        for game in range(end_game + 1, end_game + 28):
+            if game not in league_data[team]:
+                break
+            if league_data[team][game]['game_type']['playoffs'] == 'round1':
+                continue
+            if team_conf not in playoff_games:
+                playoff_games[team_conf] = {}
+            if league_data[team][game]['game_type']['playoffs'] == 'conf_semi':
+                team_seed = conf_to_comapare.index(team)
+                opp_seed = conf_to_comapare.index(league_data[team][game]['opp'])
+                if team_seed == 3 or opp_seed == 3 or team_seed == 4 or opp_seed == 4:
+                    if 'Up Semi' not in playoff_games[team_conf]:
+                        playoff_games[team_conf]['Up Semi'] = {}
+                    if game_count not in playoff_games[team_conf]['Up Semi']:
+                        playoff_games[team_conf]['Up Semi'][game_count] = {'offense': league_data[team][game]['offense'], 'defense': league_data[team][game]['defense'], 'teams': [conf_to_comapare[0], conf_to_comapare[3]]}
+                else:
+                    if 'Down Semi' not in playoff_games[team_conf]:
+                        playoff_games[team_conf]['Down Semi'] = {}
+                    if game_count not in playoff_games[team_conf]['Down Semi']:
+                        playoff_games[team_conf]['Down Semi'][game_count] = {'offense': league_data[team][game]['offense'], 'defense': league_data[team][game]['defense'], 'teams': [conf_to_comapare[1], conf_to_comapare[2]]}
+            elif league_data[team][game]['game_type']['playoffs'] == 'conf_final':
+                if not did_conf_count:
+                    game_count = 1
+                    did_conf_count = True
+                if 'conf_final' not in playoff_games[team_conf]:
+                    playoff_games[team_conf]['conf_final'] = {}
+                if game_count not in playoff_games[team_conf]['conf_final']:
+                    playoff_games[team_conf]['conf_final'][game_count] = {'offense': league_data[team][game]['offense'], 'defense': league_data[team][game]['defense'], 'teams': [conf_to_comapare[0], conf_to_comapare[1]]}
+            else:
+                if not did_final_count:
+                    game_count = 1
+                    did_final_count = True
+                if 'finals' not in playoff_games[team_conf]:
+                    playoff_games[team_conf]['finals'] = {}
+                if game_count not in playoff_games[team_conf]['finals']:
+                    playoff_games[team_conf]['finals'][game_count] = {'offense': league_data[team][game]['offense'], 'defense': league_data[team][game]['defense'], 'teams': [new_east_rank[0], new_west_rank[0]]}   
+            game_count += 1
+    playoff_games_to_add = {
+        0: ['round1', 'Up Semi', 'conf_final', 'finals'],
+        1: ['round1', 'Down Semi', 'conf_final'],
+        2: ['round1', 'Down Semi'],
+        3: ['round1', 'Up Semi'],
+        4: ['round1'],
+        5: ['round1'],
+        6: ['round1'],
+        7: ['round1']
+    }
+    conferences = [east_rank, west_rank]
+    for conf_id, conf in enumerate(conferences):
+        if conf_id == 0:
+            team_conf = 'East'
+        else:
+            team_conf = 'West'
+        for team_index in range(8):
+            team = conf[team_index]
+            games_to_add = playoff_games_to_add[team_index]
+            idx = 0
+            previous_round = None
+            for game in range(end_game + 1, end_game + 28):
+                if game not in league_data[team]:
+                    if len(games_to_add) > 1 and idx != len(games_to_add):
+                        if games_to_add[idx] == 'Up Semi' or games_to_add[idx] == 'Down Semi':
+                            add_round = 'conf_semi'
+                        else:
+                            add_round = games_to_add[idx]
+                        for games in playoff_games[team_conf][games_to_add[idx]]:
+                            if playoff_games[team_conf][games_to_add[idx]][games]['offense']['STRS'] > playoff_games[team_conf][games_to_add[idx]][games]['defense']['STRS']:
+                                league_data[team][game + games - 1] = {
+                                    'offense': playoff_games[team_conf][games_to_add[idx]][games]['offense'],
+                                    'defense': playoff_games[team_conf][games_to_add[idx]][games]['defense'],
+                                    'opp': playoff_games[team_conf][games_to_add[idx]][games]['teams'][0] if team == playoff_games[team_conf][games_to_add[idx]][games]['teams'][1] else playoff_games[team_conf][games_to_add[idx]][games]['teams'][1],
+                                    'game_type': {'playoffs': add_round}
+                                }
+                            else:
+                                league_data[team][game + games - 1] = {
+                                    'offense': playoff_games[team_conf][games_to_add[idx]][games]['defense'],
+                                    'defense': playoff_games[team_conf][games_to_add[idx]][games]['offense'],
+                                    'opp': playoff_games[team_conf][games_to_add[idx]][games]['teams'][0] if team == playoff_games[team_conf][games_to_add[idx]][games]['teams'][1] else playoff_games[team_conf][games_to_add[idx]][games]['teams'][1],
+                                    'game_type': {'playoffs': add_round}
+                                }
+                    else:
+                        break
+                elif league_data[team][game]['game_type']['playoffs'] not in games_to_add:
+                    if league_data[team][game]['game_type']['playoffs'] == 'conf_semi' and len(games_to_add) >= 2:
+                        if league_data[team][game]['game_type']['playoffs'] != previous_round:
+                            previous_round = league_data[team][game]['game_type']['playoffs']
+                            idx += 1
+                    else:
+                        del league_data[team][game]
+                if game in league_data[team] and league_data[team][game]['game_type']['playoffs'] != previous_round:
+                    previous_round = league_data[team][game]['game_type']['playoffs']
+                    idx += 1
+                if game in league_data[team] and league_data[team][game]['game_type']['playoffs'] == 'round1':
+                    continue
+                if game in league_data[team]:
+                    opp = league_data[team][game]['opp']
+                    expected_opps = playoff_games[team_conf][games_to_add[idx - 1]][1]['teams']
+                    if opp not in expected_opps:
+                        if team == expected_opps[0]:
+                            league_data[team][game]['opp'] = expected_opps[1]
+                        else:
+                            league_data[team][game]['opp'] = expected_opps[0]
+    teams = teams_dict['League']
+    for team in teams:
+        if team in east_rank:
+            compare = east_rank
+            new_compare = new_east_rank
+        else:
+            compare = west_rank
+            new_compare = new_west_rank
+        if len(league_data[team]) < 83:
+            continue
+        game_dict = {
+            'round1': {},
+            'conf_semi': {},
+            'conf_final': {},
+            'finals': {},
+        }
+        for game in range(end_game + 1, end_game + 28):
+            if game not in league_data[team]:
+                break
+            diff = max(league_data[team][game]['offense']['STRS'], league_data[team][game]['defense']['STRS']) - min(league_data[team][game]['offense']['STRS'], league_data[team][game]['defense']['STRS'])
+            game_dict[league_data[team][game]['game_type']['playoffs']][diff] = game
+        team_index = compare.index(team)
+        new_team = new_compare[team_index]
+        sorted_game_dict = {
+            'round1': None,
+            'conf_semi': None,
+            'conf_final': None,
+            'finals': None,
+        }
+        for key in game_dict:
+            if len(game_dict[key].keys()) == 0:
+                break
+            round_list = list(game_dict[key].keys())
+            round_list = sorted(round_list, reverse=True)
+            sorted_game_dict[key] = round_list
+        for key in sorted_game_dict:
+            if sorted_game_dict[key] == None:
+                break
+            count = 0
+            while count < 4:
+                game_to_add = game_dict[key][sorted_game_dict[key][count]]
+                game = league_data[team][game_to_add]
+                team_league_idx = ranked_teams.index(team)
+                opp_league_idx = ranked_teams.index(league_data[team][game_to_add]['opp'])
+                if team_league_idx < opp_league_idx:
+                    # give better
+                    if league_data[team][game_to_add]['offense']['STRS'] > league_data[team][game_to_add]['defense']['STRS']:
+                        offense = league_data[team][game_to_add]['offense']
+                        defense = league_data[team][game_to_add]['defense']
+                    else:
+                        offense = league_data[team][game_to_add]['defense']
+                        defense = league_data[team][game_to_add]['offense']
+                else:
+                    #give worse
+                    if league_data[team][game_to_add]['offense']['STRS'] > league_data[team][game_to_add]['defense']['STRS']:
+                        offense = league_data[team][game_to_add]['defense']
+                        defense = league_data[team][game_to_add]['offense']
+                    else:
+                        offense = league_data[team][game_to_add]['offense']
+                        defense = league_data[team][game_to_add]['defense']
+                if league_data[team][game_to_add]['opp'] not in compare:
+                    if team in teams_dict['Eastern']:
+                        new_opp = new_west_rank[0]
+                    else:
+                        new_opp = new_east_rank[0]
+                else:
+                    new_opp = new_compare[compare.index(league_data[team][game_to_add]['opp'])]
+                new_league_data[new_team][len(new_league_data[new_team]) + 1] = {
+                    'offense': offense,
+                    'defense': defense,
+                    'opp': new_opp,
+                    'game_type': league_data[team][game_to_add]['game_type']
+                }
+                count += 1            
+    with open(f"./data/pickle/{year}-{int(str(year)[2:]) + 1} NBA Team Stats 20.pickle", "wb") as pk:
+        pickle.dump(new_league_data, pk)
 
 def srs_ranking(teams: list, league_data: dict, end_game: int, start_game: int):
     start_time = time.time()
@@ -353,8 +549,8 @@ def rank_teams(teams: list, rank_type: str, league_data: dict, end_game: int, st
         record['diff'] = round((record['pf'] - record['pa']) / record['gp'], 3)
         ranked_teams.append([team, record['gp'], record['wins'], record['losses'], round(record['win%'], 3), round(record['pf'] / record['gp'], 1), round(record['pa'] / record['gp'], 1), record['diff']])
     sorted_teams = sorted(ranked_teams, key=lambda x: x[4], reverse=True)
-    ranked_teams = ranking_teams(sorted_teams, rank_type, league_data, end_game, start_game)
-    return_list = [team[0] for team in ranked_teams]
+    # ranked_teams = ranking_teams(sorted_teams, rank_type, league_data, end_game, start_game)
+    return_list = [team[0] for team in sorted_teams]
     return return_list
 
 def ranking_teams(teams: list, rank_type: str, league_data: dict, end_game: int, start_game = 1) -> list:
@@ -382,72 +578,75 @@ def ranking_teams(teams: list, rank_type: str, league_data: dict, end_game: int,
                     else:
                         break
                 multi_div_winners = multi_div_winner(multi_teams, league_data, end_game, start_game, teams)
-                if multi_div_winners != 'continue':
+                if len(multi_div_winners) == 2:
+                    rank_two_teams(multi_div_winners[0], multi_div_winners[1], league_data, end_game, start_game, ranked_list, teams, count)
+                elif multi_div_winners != 'continue':
                     ranked_list.append(multi_div_winners[0])
                     for idx in range(len(multi_div_winners)):
                         teams[count + idx] = multi_div_winners[idx]
-                else:
-                    a = 5
             else:
-                # checking for 2 teams
-                team1 = team[0]
-                team2 = compare_team[0]
-                h2h = head2head(league_data[team[0]], compare_team[0], end_game, start_game)
-                if h2h == 0:
+                rank_two_teams(team, compare_team, league_data, end_game, start_game, ranked_list, teams, count)            
+    return ranked_list
+
+def rank_two_teams(team: list, compare_team: list, league_data: dict, end_game: int, start_game: int, ranked_list: list, teams: list, count: int):
+    # checking for 2 teams
+    team1 = team[0]
+    team2 = compare_team[0]
+    h2h = head2head(league_data[team[0]], compare_team[0], end_game, start_game)
+    if h2h == 0:
+        ranked_list.append(team)
+    elif h2h == 1:
+        move = compare_team
+        ranked_list.append(teams[count + 1])
+        teams[count + 1] = team
+        teams[count] = move
+    else:
+        div_winner = check_if_div_winner(team1, team2, league_data, end_game, start_game, teams)
+        if div_winner == 0:
+            ranked_list.append(team)
+        elif div_winner == 1:
+            move = compare_team
+            ranked_list.append(teams[count + 1])
+            teams[count + 1] = team
+            teams[count] = move
+        else:
+            if div_winner[0] == div_winner[1]:
+                #check division record
+                div_pct = div_win_pct(team1, team2, div_winner[0], league_data, end_game, start_game)
+                if div_pct == 0:
                     ranked_list.append(team)
-                elif h2h == 1:
-                    move = compare_team
+                    return
+                elif div_pct == 1:
                     ranked_list.append(teams[count + 1])
                     teams[count + 1] = team
-                    teams[count] = move
+                    return
+            conf_check = conf_win_pct(team1, team2, league_data, end_game, start_game)
+            if conf_check == 0:
+                ranked_list.append(team)
+            elif conf_check == 1:
+                ranked_list.append(teams[count + 1])
+                teams[count + 1] = team
+            else:
+                conf_play_check = conf_playoff_win_pct(team1, team2, teams, league_data, end_game, start_game)
+                if conf_play_check == 0:
+                    ranked_list.append(team)
+                elif conf_play_check == 1:
+                    ranked_list.append(teams[count + 1])
+                    teams[count + 1] = team
                 else:
-                    div_winner = check_if_div_winner(team1, team2, league_data, end_game, start_game, teams)
-                    if div_winner == 0:
+                    non_conf_play_check = conf_playoff_win_pct(team1, team2, league_data, end_game, start_game)
+                    if non_conf_play_check == 0:
                         ranked_list.append(team)
-                    elif div_winner == 1:
-                        move = compare_team
+                    elif non_conf_play_check == 1:
                         ranked_list.append(teams[count + 1])
                         teams[count + 1] = team
-                        teams[count] = move
                     else:
-                        if div_winner[0] == div_winner[1]:
-                            #check division record
-                            div_pct = div_win_pct(team1, team2, div_winner[0], league_data, end_game, start_game)
-                            if div_pct == 0:
-                                ranked_list.append(team)
-                                continue
-                            elif div_pct == 1:
-                                ranked_list.append(teams[count + 1])
-                                teams[count + 1] = team
-                                continue
-                        conf_check = conf_win_pct(team1, team2, league_data, end_game, start_game)
-                        if conf_check == 0:
+                        net_points = net_point_diff(team1, team2, league_data, end_game, start_game)
+                        if net_points == 0:
                             ranked_list.append(team)
-                        elif conf_check == 1:
-                            ranked_list.append(teams[count + 1])
-                            teams[count + 1] = team
                         else:
-                            conf_play_check = conf_playoff_win_pct(team1, team2, league_data, end_game, start_game)
-                            if conf_play_check == 0:
-                                ranked_list.append(team)
-                            elif conf_play_check == 1:
-                                ranked_list.append(teams[count + 1])
-                                teams[count + 1] = team
-                            else:
-                                non_conf_play_check = conf_playoff_win_pct(team1, team2, league_data, end_game, start_game)
-                                if non_conf_play_check == 0:
-                                    ranked_list.append(team)
-                                elif non_conf_play_check == 1:
-                                    ranked_list.append(teams[count + 1])
-                                    teams[count + 1] = team
-                                else:
-                                    net_points = net_point_diff(team1, team2, league_data, end_game, start_game)
-                                    if non_conf_play_check == 0:
-                                        ranked_list.append(team)
-                                    else:
-                                        ranked_list.append(teams[count + 1])
-                                        teams[count + 1] = team                
-    return ranked_list
+                            ranked_list.append(teams[count + 1])
+                            teams[count + 1] = team  
 
 def net_point_diff(team1: str, team2: str, league_data: str, end_game: int, start_game: int):
     team1_points = [0, 0]
@@ -498,27 +697,27 @@ def non_conf_playoff_win_pct(team1: str, team2: str, league_data: str, end_game:
     else:
         'continue'
 
-def conf_playoff_win_pct(team1: str, team2: str, league_data: str, end_game: int, start_game: int):
+def conf_playoff_win_pct(team1: str, team2: str, teams: list, league_data: str, end_game: int, start_game: int):
     team1_record = [0, 0]
     team2_record = [0, 0]
     if team1 in teams_dict['Eastern']:
-        teams = teams_dict['Eastern']
+        conf_teams = teams_dict['Eastern']
     else:
-        teams = teams_dict['Western']
+        conf_teams = teams_dict['Western']
     if year >= 2020:
         min_rank = 10
     else:
         min_rank = 8
-    conf_rank = ranking_teams(teams, league_data, 82, 1)
+    conf_rank = [team[0] for team in teams]
     for game in range(start_game, end_game + 1):
         #check for team 1
-        if conf_rank.index(league_data[team1][game]['opp']) >= min_rank and league_data[team1][game]['opp'] in conf_rank:
+        if league_data[team1][game]['opp'] in conf_rank and conf_rank.index(league_data[team1][game]['opp']) >= min_rank:
             if league_data[team1][game]['offense']['PTS'] > league_data[team1][game]['defense']['PTS']:
                 team1_record[0] += 1
             else:
                 team1_record[1] += 1
         #check for team 2
-        if conf_rank.index(league_data[team1][game]['opp']) >= min_rank and league_data[team1][game]['opp'] in conf_rank:
+        if league_data[team2][game]['opp'] in conf_rank and conf_rank.index(league_data[team2][game]['opp']) >= min_rank :
             if league_data[team2][game]['offense']['PTS'] > league_data[team2][game]['defense']['PTS']:
                 team2_record[0] += 1
             else:
@@ -690,8 +889,12 @@ def multi_div_winner(teams_to_check: list, league_data: dict, end_game: int, sta
         teams_to_check[0] = teams_to_check[winner_index]
         teams_to_check[winner_index] = move
         return teams_to_check
-    else:
-        a = 5
+    elif div_leaders > 1:
+        return_list = []
+        for idx, div_rank in enumerate(index_list):
+            if div_rank == 0:
+                return_list.append(teams_to_check[idx])
+        return return_list
 
 function_map = {
     '0.0': make_00_pickle,
@@ -701,25 +904,25 @@ function_map = {
     '2.0': make_20_pickle,
 }
 
-# year = 2023
-# league_types = ['0.0', '0.1', '1.0', '1.1', '2.0']#, '2.1', '3.0', '3.1', '4.0']
-# start = time.time()
-# team_stats = {}
-# for year in range(year, 2024):
-#     team_file = f"./data/csv/{year}-{int(str(year)[2:]) + 1} NBA Team Stats.csv"
-#     with open(team_file, 'r') as team_file:
-#         reading_file = csv.reader(team_file)
-#         process_team_data(reading_file, team_stats)
-#     with open("2023-24 NBA Team Stats.pickle", "wb") as pk:
-#         pickle.dump(team_stats, pk)
-#     for league_type in league_types:
-#         function_map[league_type](year)
+year = 2021
+league_types = ['0.0', '0.1', '1.0', '1.1', '2.0']#, '2.1', '3.0', '3.1', '4.0']
+start = time.time()
+team_stats = {}
+for year in range(year, 2023):
+    team_file = f"./data/csv/{year}-{int(str(year)[2:]) + 1} NBA Team Stats.csv"
+    with open(team_file, 'r') as team_file:
+        reading_file = csv.reader(team_file)
+        process_team_data(reading_file, team_stats)
+    with open(f"{year}-{int(str(year)[2:]) + 1} NBA Team Stats.pickle", "wb") as pk:
+        pickle.dump(team_stats, pk)
+    for league_type in league_types:
+        function_map[league_type](year)
 
-# print(f"Total Run Time: {time.time() - start}")
-year = 2016
-start_time = time.time()
-with open(f"./data/pickle/{year}-{int(str(year)[2:]) + 1} NBA Team Stats 10.pickle", "rb") as f:
-    league_data = pickle.load(f)
-print(f"file load time was {time.time() - start_time}")
-a = srs_ranking(teams_dict['League'], league_data, 82, 1)
-print(a)
+print(f"Total Run Time: {time.time() - start}")
+# year = 2016
+# start_time = time.time()
+# with open(f"./data/pickle/{year}-{int(str(year)[2:]) + 1} NBA Team Stats 10.pickle", "rb") as f:
+#     league_data = pickle.load(f)
+# print(f"file load time was {time.time() - start_time}")
+# a = srs_ranking(teams_dict['League'], league_data, 82, 1)
+# print(a)
