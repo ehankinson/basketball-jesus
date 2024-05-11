@@ -94,34 +94,27 @@ def calculate_pct(above: int, below: int):
         return 0.000
     return round(above / below, 3)
 
-def calculating_record(league_type: str, team_stats: dict, year: str, game: int, record: dict, team: str):
-    if league_type == '0.0':
-        points_for = team_stats[game]['offense']['PTS']
-        points_againts = team_stats[game]['defense']['PTS']
-        if points_for > points_againts:
-            record['Wins'] += 1
-            return
-        record['Loses'] += 1
-    elif league_type == '0.1':
-        points_for = team_stats[game]['offense']['PTS']
-        points_againts = team_stats[game]['defense']['PTS']
-        if points_for < points_againts:
-            record['Wins'] += 1
-            return
-        record['Loses'] += 1
+def calculating_record(team_stats: dict, game: int, record: dict, team: str):
+    points_for = team_stats[game]['offense']['PTS']
+    points_againts = team_stats[game]['defense']['PTS']
+    if points_for > points_againts:
+        record['Wins'] += 1
+        return
+    record['Loses'] += 1
 
 def team_record(team: str, year: str, league_type: str, end_game: int, start_game = 1, opened = None, team_stats = None) -> dict[str, int]:
     record = {'Wins': 0, 'Loses': 0}
     if not opened:
-        with open("team_stats.pickle", "rb") as f:
-            league_stats = pickle.load(f)
-            team_stats = league_stats[team][year]
+        file_league_type = league_type.replace(".", "")
+        with open(f"data/pickle/{year} NBA Team Stats {file_league_type}.pickle", "rb") as f:
+            team_stats = pickle.load(f)
+            team_stats = team_stats[team]
     for game in range(start_game, end_game + 1):
         if start_game not in team_stats:
             return "Did not make the playoffs"
         if game not in team_stats:
             continue
-        calculating_record(league_type, team_stats, year, game, record, team)
+        calculating_record(team_stats, game, record, team)
     return record
 
 def season_ranking(year: str, end_game: int, start_game = 1):
@@ -197,15 +190,16 @@ def season_stats(team: str, year: str, league_type: str, side_of_ball: str, end_
 #----------------------------------------------------------------
 # Power Ranking Calculations
 def power_rankings(teams: list, year: str, league_type: str, end_game: int, start_game = 1):
-    with open("team_stats.pickle", "rb") as f:
-        opened = True
+    file_league_type = league_type.replace(".", "")
+    with open(f"data/pickle/{year} NBA Team Stats {file_league_type}.pickle", "rb") as f:
         league_stats = pickle.load(f)
-        if league_type == '0.0':
-            power_list = power_rankigns_00(teams, year, league_type, end_game, start_game, league_stats)
-        elif league_type == '0.1':
-            power_list = power_rankings_01(teams, year, league_type, end_game, start_game, opened, league_stats)
-        elif league_type == '1.0':
-            power_list = power_rankings_10(teams, year, league_type, end_game, start_game, league_stats)
+    power_list = []
+    for team in league_stats:
+        team_stats = league_stats[team]
+        stats = calculating_power_ranking(team, year, team_stats, league_type, end_game, start_game)
+        if stats == "Did not make Playoffs":
+            continue
+        power_list.append(stats)
     return_list = sorted(power_list, key=lambda x: x[6], reverse=True)
     for rank, team in enumerate(return_list):
         team.insert(0, rank + 1)
@@ -255,22 +249,13 @@ def calculating_power_ranking(team: str, year: str, team_stats: dict, league_typ
                 offense[key] += 1
                 defense[key] += 1
                 continue
-            if league_type == '0.0':
-                if key == 'PTS':
-                    if team_stats[game]['offense'][key] > team_stats[game]['defense'][key]:
-                        record['wins'] += 1
-                    else:
-                        record['losses'] += 1
-                offense[key] += team_stats[game]['offense'][key]
-                defense[key] += team_stats[game]['defense'][key]
-            else:
-                if key == 'PTS':
-                    if team_stats[game]['defense'][key] > team_stats[game]['offense'][key]:
-                        record['wins'] += 1
-                    else:
-                        record['losses'] += 1
-                offense[key] += team_stats[game]['defense'][key]
-                defense[key] += team_stats[game]['offense'][key]
+            if key == 'PTS':
+                if team_stats[game]['offense'][key] > team_stats[game]['defense'][key]:
+                    record['wins'] += 1
+                else:
+                    record['losses'] += 1
+            offense[key] += team_stats[game]['offense'][key]
+            defense[key] += team_stats[game]['defense'][key]
     off_gmsc = game_score(offense['PTS'] / offense['GP'], offense['FGM'] / offense['GP'], offense['FGA'] / offense['GP'], offense['FTA'] / offense['GP'], offense['FTM'] / offense['GP'], offense['ORB'] / offense['GP'], offense['DRB'] / offense['GP'], offense['STL'] / offense['GP'], offense['AST'] / offense['GP'], offense['BLK'] / offense['GP'], offense['PF'] / offense['GP'], offense['TOV'] / offense['GP'])
     def_gmsc = game_score(defense['PTS'] / defense['GP'], defense['FGM'] / defense['GP'], defense['FGA'] / defense['GP'], defense['FTA'] / defense['GP'], defense['FTM'] / defense['GP'], defense['ORB'] / defense['GP'], defense['DRB'] / defense['GP'], defense['STL'] / defense['GP'], defense['AST'] / defense['GP'], defense['BLK'] / defense['GP'], defense['PF'] / defense['GP'], defense['TOV'] / defense['GP'])
     diff_gmsc = round(off_gmsc - def_gmsc, 1)
@@ -479,9 +464,9 @@ def player_season_stats(player: str, year: str, league_type: str, end_game: int,
     return [player, year, pos, player_dict['GP'], round(player_dict_per_game['MP'], 1), round(player_dict_per_game['PTS'], 1), round(player_dict_per_game['FGM'], 1), round(player_dict_per_game['FGA'], 1), round(fg_pct, 3), round(eFG, 3), round(player_dict_per_game['2PM'], 1), round(player_dict_per_game['2PA'], 1), round(pct_2p, 3), round(player_dict_per_game['3PM'], 1), round(player_dict_per_game['3PA'], 1), round(pct_3p, 3), round(player_dict_per_game['FTM'], 1), round(player_dict_per_game['FTA'], 1), round(ft_pct, 3), round(player_dict_per_game['ORB'], 1), round(player_dict_per_game['DRB'], 1), round(trb, 1), round(player_dict_per_game['AST'], 1), round(player_dict_per_game['STL'], 1), round(player_dict_per_game['BLK'], 1), round(player_dict_per_game['TOV'], 1), round(player_dict_per_game['PF'], 1), round(player_dict_per_game['oRtg'], 1), round(player_dict_per_game['dRtg'], 1), round(player_dict_per_game['nRtg'], 1), fp, gmsc, spr]
 
 
-teams = ['GSW', 'ATL', 'BOS', 'BRK', 'CHO', 'CHI', 'CLE', 'DAL', 'DEN', 'DET', 'HOU', 'IND', 'LAC', 'LAL', 'MEM', 'MIA', 'MIL', 'MIN', 'NOP', 'NYK', 'OKC', 'ORL', 'PHI', 'PHO', 'POR', 'SAC', 'SAS', 'TOR', 'UTA', 'WAS']
+# teams = ['GSW', 'ATL', 'BOS', 'BRK', 'CHO', 'CHI', 'CLE', 'DAL', 'DEN', 'DET', 'HOU', 'IND', 'LAC', 'LAL', 'MEM', 'MIA', 'MIL', 'MIN', 'NOP', 'NYK', 'OKC', 'ORL', 'PHI', 'PHO', 'POR', 'SAC', 'SAS', 'TOR', 'UTA', 'WAS']
 # # # for team in teams: 
-a = player_rankings(teams, '2023-24', '0.0', 82)
+# a = player_rankings(teams, '2023-24', '0.0', 82)
 # a = player_season_stats('Trae Young', '2023-24', '0.0', 82)
 # # a = rank_teams(teams, '2020-21', '0.0', 73, 1)
-print(a)
+# print(a)
