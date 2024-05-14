@@ -95,7 +95,7 @@ def process_team_data(reading_file: list, team_stats: dict):
         team = line[1]
         if team not in team_stats:
             team_stats[team] = {}
-        if len(team_stats[team]) > 82:
+        if team == 'CHA':
             a = 5
         game = len(team_stats[team]) + 1
         if game not in team_stats[team]:
@@ -164,13 +164,13 @@ def lower_than(off_stats: dict, def_stats: dict):
     return new_off, new_def
 
 def make_00_pickle(year: int):
-    with open(f"{year}-{int(str(year)[2:]) + 1} NBA Team Stats.pickle", "rb") as pk:
+    with open(f"{year} NBA Team Stats.pickle", "rb") as pk:
         league_stats = pickle.load(pk)
-    with open(f"./data/pickle/{year}-{int(str(year)[2:]) + 1} NBA Team Stats 00.pickle", "wb") as pk:
+    with open(f"./data/pickle/{year} NBA Team Stats 00.pickle", "wb") as pk:
         pickle.dump(league_stats, pk)
 
 def make_01_pickle(year: int):
-    with open(f"./data/pickle/{year}-{int(str(year)[2:]) + 1} NBA Team Stats 00.pickle", "rb") as f:
+    with open(f"./data/pickle/{year} NBA Team Stats 00.pickle", "rb") as f:
         league_data = pickle.load(f)
     if year != 2020:
         end_game = 82
@@ -178,7 +178,7 @@ def make_01_pickle(year: int):
     else:
         end_game = 72
         start_game = 1
-    with open(f"./data/pickle/{year}-{int(str(year)[2:]) + 1} NBA Standings.pickle", "rb") as f:
+    with open(f"./data/pickle/{year} NBA Standings.pickle", "rb") as f:
         standings = pickle.load(f)
     eastern_ranks = standings['East']
     western_ranks = standings['West']
@@ -227,11 +227,11 @@ def make_01_pickle(year: int):
                     new_league_data[team][game]['defense'] = league_data[team][game]['offense']
                     new_league_data[team][game]['opp'] = league_data[team][game]['opp']
                     new_league_data[team][game]['game_type'] = league_data[team][game]['game_type']
-    with open(f"./data/pickle/{year}-{int(str(year)[2:]) + 1} NBA Team Stats 01.pickle", "wb") as pk:
+    with open(f"./data/pickle/{year} NBA Team Stats 01.pickle", "wb") as pk:
         pickle.dump(new_league_data, pk)
 
 def make_10_pickle(year: int):
-    with open(f"./data/pickle/{year}-{int(str(year)[2:]) + 1} NBA Team Stats 00.pickle", "rb") as f:
+    with open(f"./data/pickle/{year} NBA Team Stats 00.pickle", "rb") as f:
         league_data = pickle.load(f)
     new_league_data = {}
     for team in league_data:
@@ -248,11 +248,11 @@ def make_10_pickle(year: int):
                 new_league_data[team][game]['defense'] = new_def
             new_league_data[team][game]['opp'] = league_data[team][game]['opp']
             new_league_data[team][game]['game_type'] = league_data[team][game]['game_type']
-    with open(f"./data/pickle/{year}-{int(str(year)[2:]) + 1} NBA Team Stats 10.pickle", "wb") as pk:
+    with open(f"./data/pickle/{year} NBA Team Stats 10.pickle", "wb") as pk:
         pickle.dump(new_league_data, pk)
 
 def make_11_pickle(year: int):
-    with open(f"./data/pickle/{year}-{int(str(year)[2:]) + 1} NBA Team Stats 01.pickle", "rb") as f:
+    with open(f"./data/pickle/{year} NBA Team Stats 01.pickle", "rb") as f:
         league_data = pickle.load(f)
     new_league_data = {}
     for team in league_data:
@@ -269,20 +269,20 @@ def make_11_pickle(year: int):
                 new_league_data[team][game]['defense'] = new_def
             new_league_data[team][game]['opp'] = league_data[team][game]['opp']
             new_league_data[team][game]['game_type'] = league_data[team][game]['game_type']
-    with open(f"./data/pickle/{year}-{int(str(year)[2:]) + 1} NBA Team Stats 11.pickle", "wb") as pk:
+    with open(f"./data/pickle/{year} NBA Team Stats 11.pickle", "wb") as pk:
         pickle.dump(new_league_data, pk)
 
 def make_20_pickle(year: int):
-    with open(f"./data/pickle/{year}-{int(str(year)[2:]) + 1} NBA Team Stats 10.pickle", "rb") as f:
+    with open(f"./data/pickle/{year} NBA Team Stats 10.pickle", "rb") as f:
         league_data = pickle.load(f)
     ranked_teams = srs_ranking(teams_dict['League'], league_data, 82, 1)
     ranked_teams = [team[0] for team in ranked_teams]
-    with open(f"./data/pickle/{year}-{int(str(year)[2:]) + 1} NBA Standings.pickle", "rb") as f:
+    with open(f"./data/pickle/{year} NBA Standings.pickle", "rb") as f:
         standings = pickle.load(f)
     east_rank = standings['East']
     west_rank = standings['West']
     new_league_data = {}
-    if year == 2020:
+    if int(year[:4]) == 2020:
         end_game = 72
     else:
         end_game = 82
@@ -493,19 +493,19 @@ def make_20_pickle(year: int):
                     'game_type': league_data[team][game_to_add]['game_type']
                 }
                 count += 1            
-    with open(f"./data/pickle/{year}-{int(str(year)[2:]) + 1} NBA Team Stats 20.pickle", "wb") as pk:
+    with open(f"./data/pickle/{year} NBA Team Stats 20.pickle", "wb") as pk:
         pickle.dump(new_league_data, pk)
 
 def make_21_pickle(year: int):
-    with open(f"./data/pickle/{year}-{int(str(year)[2:]) + 1} NBA Team Stats 11.pickle", "rb") as f:
+    with open(f"./data/pickle/{year} NBA Team Stats 11.pickle", "rb") as f:
         league_data = pickle.load(f)
-    if year == 2020:
+    if int(year[:4]) == 2020:
         end_game = 72
     else:
         end_game = 82
     ranked_teams = srs_ranking(teams_dict['League'], league_data, end_game, 1)
     ranked_teams = [team[0] for team in ranked_teams]
-    with open(f"./data/pickle/{year}-{int(str(year)[2:]) + 1} NBA Standings.pickle", "rb") as f:
+    with open(f"./data/pickle/{year} NBA Standings.pickle", "rb") as f:
         standings = pickle.load(f)
     east_rank = standings['East'][::-1]
     west_rank = standings['West'][::-1]
@@ -719,7 +719,7 @@ def make_21_pickle(year: int):
                     'game_type': league_data[team][game_to_add]['game_type']
                 }
                 count += 1            
-    with open(f"./data/pickle/{year}-{int(str(year)[2:]) + 1} NBA Team Stats 21.pickle", "wb") as pk:
+    with open(f"./data/pickle/{year} NBA Team Stats 21.pickle", "wb") as pk:
         pickle.dump(new_league_data, pk)
 
 def srs_ranking(teams: list, league_data: dict, end_game: int, start_game: int):
@@ -898,7 +898,7 @@ def non_conf_playoff_win_pct(team1: str, team2: str, league_data: str, end_game:
         teams = teams_dict['Western']
     else:
         teams = teams_dict['Eastern']
-    if year >= 2020:
+    if int(year[:4]) >= 2020:
         min_rank = 10
     else:
         min_rank = 8
@@ -932,7 +932,7 @@ def conf_playoff_win_pct(team1: str, team2: str, teams: list, league_data: str, 
         conf_teams = teams_dict['Eastern']
     else:
         conf_teams = teams_dict['Western']
-    if year >= 2020:
+    if int(year[:4]) >= 2020:
         min_rank = 10
     else:
         min_rank = 8
@@ -1133,20 +1133,40 @@ function_map = {
     '2.1': make_21_pickle
 }
 
-year = 2014
+year = 2007
+if year < 2014:
+    teams_dict['League'][3] = 'CHA'
+    teams_dict['Eastern'][3] = 'CHA'
+    teams_dict['Southeast'][1] = 'CHA'
+if year < 2013:
+    teams_dict['League'][18] = 'NOH'
+    teams_dict['Western'][8] = 'NOH'
+    teams_dict['Southwest'][3] = 'NOH'
+if year < 2011:
+    teams_dict['League'][2] = 'NJN'
+    teams_dict['Eastern'][2] = 'NJN'
+    teams_dict['Atlantic'][1] = 'NJN'
+if year < 2008:
+    teams_dict['League'][20] = 'SEA'
+    teams_dict['Western'][9] = 'SEA'
+    teams_dict['Northwest'][2] = 'SEA'
+
+if year < 2009:
+    back_year = f"0{int(str(year)[2:]) + 1}"
+    year = f"{year}-{back_year}"
+else:
+    year = {year}-{int(str(year)[2:]) + 1}
 league_types = ['0.0', '0.1', '1.0', '1.1', '2.0', '2.1']#, '3.0', '3.1', '4.0']
 start = time.time()
-for year in range(year, year + 1):
-    team_stats = {}
-    team_file = f"./data/csv/{year}-{int(str(year)[2:]) + 1} NBA Team Stats.csv"
-    with open(team_file, 'r') as team_file:
-        reading_file = csv.reader(team_file)
-        process_team_data(reading_file, team_stats)
-    with open(f"{year}-{int(str(year)[2:]) + 1} NBA Team Stats.pickle", "wb") as pk:
-        pickle.dump(team_stats, pk)
-    for league_type in league_types:
-        function_map[league_type](year)
-
+team_stats = {}
+team_file = f"./data/csv/{year} NBA Team Stats.csv"
+with open(team_file, 'r') as team_file:
+    reading_file = csv.reader(team_file)
+    process_team_data(reading_file, team_stats)
+with open(f"{year} NBA Team Stats.pickle", "wb") as pk:
+    pickle.dump(team_stats, pk)
+for league_type in league_types:
+    function_map[league_type](year)
 print(f"Total Run Time: {time.time() - start}")
 # year = 2016
 # start_time = time.time()

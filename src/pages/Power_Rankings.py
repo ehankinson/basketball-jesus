@@ -24,6 +24,23 @@ with teams_select:
     'Pacific': ['GSW', 'LAC', 'LAL', 'PHO', 'SAC'],
     'Southwest': ['DAL', 'HOU', 'MEM', 'NOP', 'SAS']
     }
+    
+    if year != None and int(year[:4]) < 2014:
+        teams['League'][3] = 'CHA'
+        teams['Eastern'][3] = 'CHA'
+        teams['Southeast'][1] = 'CHA'
+    if year != None and int(year[:4]) < 2014:
+        teams['League'][18] = 'NOH'
+        teams['Western'][8] = 'NOH'
+        teams['Southwest'][3] = 'NOH'
+    if year != None and int(year[:4]) < 2011:
+        teams['League'][2] = 'NJN'
+        teams['Eastern'][2] = 'NJN'
+        teams['Atlantic'][1] = 'NJN'
+    if year != None and int(year[:4]) < 2008:
+        teams['League'][20] = 'SEA'
+        teams['Western'][9] = 'SEA'
+        teams['Northwest'][2] = 'SEA'
     team_list = teams[option]
 
 with season_type:
@@ -68,8 +85,8 @@ if season_type_opt == 'Post Season':
         ranked_teams = power_rankings(team_list, year, st.session_state['league_type'], end_game + 82, start_game + 82)
 else:
     ranked_teams = power_rankings(team_list, year, st.session_state['league_type'], end_game, start_game)
-columns = ['Rank', 'Teams', 'Year', 'GP', 'Wins', 'Losses', 'Pct', 'STRS', 'SORS','SDRS', 'PF', 'PA', 'DIFF', 'FP For', 'FP Againts', 'Diff', 'Off GmSc', 'Def GmSc', 'Game Score Diff']
-display_columns = ['Teams', 'Year', 'GP', 'Wins', 'Losses', 'Pct', 'STRS', 'SORS','SDRS', 'PF', 'PA', 'DIFF', 'Fantasy Poitns For', 'Fantasy Points Againts', 'Diff', 'Off Game Score', 'Def Game Score', 'Game Score Diff']
+columns = ['Rank', 'Teams', 'Year', 'GP', 'Wins', 'Losses', 'Pct', 'SRS', 'STRS', 'SORS','SDRS', 'PF', 'PA', 'DIFF', 'FP For', 'FP Againts', 'Diff', 'Off GmSc', 'Def GmSc', 'Game Score Diff']
+display_columns = ['Teams', 'Year', 'GP', 'Wins', 'Losses', 'Pct', 'SRS', 'STRS', 'SORS','SDRS', 'PF', 'PA', 'DIFF', 'Fantasy Poitns For', 'Fantasy Points Againts', 'Diff', 'Off Game Score', 'Def Game Score', 'Game Score Diff']
 df = pd.DataFrame(ranked_teams, columns=columns)
 # df = df[display_columns]
 st.dataframe(df, hide_index=True, height=1015)

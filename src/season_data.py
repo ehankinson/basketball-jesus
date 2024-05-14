@@ -1,5 +1,6 @@
 import time
 import pickle
+import numpy as np
 from advanced_stats import calculate_player_advanced_stats
 
 nba_teams = {
@@ -7,6 +8,7 @@ nba_teams = {
     "BOS": "Boston Celtics",
     "BRK": "Brooklyn Nets",
     "CHI": "Chicago Bulls",
+    "CHA": "Charlotte Bobcats",
     "CHO": "Charlotte Hornets",
     "CLE": "Cleveland Cavaliers",
     "DAL": "Dallas Mavericks",
@@ -21,6 +23,8 @@ nba_teams = {
     "MIA": "Miami Heat",
     "MIL": "Milwaukee Bucks",
     "MIN": "Minnesota Timberwolves",
+    "NJN": "New Jersey Nets",
+    "NOH": "New Orleans Hornets",
     "NOP": "New Orleans Pelicans",
     "NYK": "New York Knicks",
     "OKC": "Oklahoma City Thunder",
@@ -30,6 +34,7 @@ nba_teams = {
     "POR": "Portland Trail Blazers",
     "SAC": "Sacramento Kings",
     "SAS": "San Antonio Spurs",
+    "SEA": "Seattle SuperSonics",
     "TOR": "Toronto Raptors",
     "UTA": "Utah Jazz",
     "WAS": "Washington Wizards"
@@ -142,7 +147,7 @@ def rank_teams(teams: list, year: str, league_type: str, end_game: int, start_ga
         team.insert(0, seed + 1)
     return sorted_records
 
-def calculating_regular_stats(year_stats: dict, game: int, side_of_ball: str, season_stats: dict):
+def stats_per_league_type(year_stats, game, side_of_ball, season_stats):
     for stat in year_stats[game][side_of_ball]:
         if stat == 'OPP':
             continue
@@ -151,29 +156,20 @@ def calculating_regular_stats(year_stats: dict, game: int, side_of_ball: str, se
             continue
         season_stats[stat] += year_stats[game][side_of_ball][stat]
 
-def stats_per_league_type(league_type, year_stats, game, side_of_ball, season_stats):
-    if league_type == '0.0':
-        calculating_regular_stats(year_stats, game, side_of_ball, season_stats)
-    elif league_type == '0.1':
-        if type == 'offense':
-            new_type = 'defense'
-        else:
-            new_type = 'offense'
-        calculating_regular_stats(year_stats, game, new_type, season_stats)
-
 def season_stats(team: str, year: str, league_type: str, side_of_ball: str, end_game: int, start_game = 1):
     season_stats = {}
     season_stats['GP'] = 0
-    with open("team_stats.pickle", "rb") as f:
+    file_league_type = league_type.replace(".", "")
+    with open(f"data/pickle/{year} NBA Team Stats {file_league_type}.pickle", "rb") as f:
         team_stats = pickle.load(f)
-        year_stats = team_stats[team][year]
+        year_stats = team_stats[team]
         if start_game not in year_stats:
             return "Did Not Make Playoffs"
         for game in range(start_game, end_game + 1):
             if game not in year_stats:
                 continue
             season_stats['GP'] += 1
-            stats_per_league_type(league_type, year_stats, game, side_of_ball, season_stats)
+            stats_per_league_type(year_stats, game, side_of_ball, season_stats)
     season_stats['2P%'] = round(season_stats['2PM'] / season_stats['2PA'], 3)
     season_stats['3P%'] = round(season_stats['3PM'] / season_stats['3PA'], 3)
     season_stats['FT%'] = round(season_stats['FTM'] / season_stats['FTA'], 3)
@@ -186,6 +182,41 @@ def season_stats(team: str, year: str, league_type: str, side_of_ball: str, end_
     season_stats['GmSc'] = game_score(stat_per_game('PTS', 'GP', season_stats), stat_per_game('FGM', 'GP', season_stats), stat_per_game('FGA', 'GP', season_stats), stat_per_game('FTA', 'GP', season_stats), stat_per_game('FTM', 'GP', season_stats), stat_per_game('ORB', 'GP', season_stats), stat_per_game('DRB', 'GP', season_stats), stat_per_game('STL', 'GP', season_stats), stat_per_game('AST', 'GP', season_stats), stat_per_game('BLK', 'GP', season_stats), stat_per_game('PF', 'GP', season_stats), stat_per_game('TOV', 'GP', season_stats))
     season_stats['STRS'] = round((stat_per_game('PTS', 'GP', season_stats) + stat_per_game('FP', 'GP', season_stats) + season_stats['GmSc']) / 3, 3)
     return season_stats
+
+def team_stats_to_list(team: str, year: str, league_type: str, stat_type: str, end_game: int, start_game: int):
+    team_stats = season_stats(team, year, league_type, stat_type, end_game, start_game)
+    if team_stats == 'Did Not Make Playoffs':
+        return 'Did Not Make Playoffs'
+    keys = ['GP', 'PTS', 'FGM', 'FGA', 'FG%', 'eFG%','2PM', '2PA', '2P%', '3PM', '3PA', '3P%', 'FTM', 'FTA', 'FT%', 'ORB', 'DRB', 'TRB', 'AST', 'STL', 'BLK', 'TOV', 'PF']
+    team_list = [nba_teams[team], year]
+    for key in keys:
+        if key == 'GP' or '%' in key:
+            team_list.append(team_stats[key])
+            continue
+        team_list.append(round(team_stats[key] / team_stats['GP'], 1))
+    team_list.append(round(team_stats['FP'] / team_stats['GP'], 2))
+    team_list.append(team_stats['GmSc'])
+    team_list.append(team_stats['STRS'])
+    return team_list
+
+def league_team_stats(team_list: list, year: str, season_type_opt: str, league_type: str, type: str, end_game: int, start_game: int):
+    total_stats = []
+    for team in team_list:
+        if season_type_opt == 'Post Season':
+            if year == '2020-21':
+                team_stats = team_stats_to_list(team, year, league_type, type, end_game + 72, start_game + 72)
+            else:
+                team_stats = team_stats_to_list(team, year, league_type, type, end_game + 82, start_game + 82)
+        else:
+            team_stats = team_stats_to_list(team, year, league_type, type, end_game, start_game)
+        if team_stats == 'Did Not Make Playoffs':
+            continue
+        total_stats.append(team_stats)
+    if type == 'offense':
+        sorted_team = sorted(total_stats, key=lambda x: x[27], reverse=True)
+    else:
+        sorted_team = sorted(total_stats, key=lambda x: x[27])
+    return sorted_team
 
 #----------------------------------------------------------------
 # Power Ranking Calculations
@@ -201,10 +232,11 @@ def power_rankings(teams: list, year: str, league_type: str, end_game: int, star
             continue
         power_list.append(stats)
     return_list = sorted(power_list, key=lambda x: x[6], reverse=True)
-    for rank, team in enumerate(return_list):
+    final_team_list = srs_ranking(return_list, league_stats, end_game, start_game)
+    for rank, team in enumerate(final_team_list):
         team.insert(0, rank + 1)
         team[1] = nba_teams[team[1]]
-    return return_list
+    return final_team_list
 
 def adding_playoff_games_for_point_ones(team: str, year: str, league_stats: dict, team_stats: dict, standings: list, end_game: str, start_game = 1):
     seed = (15 - standings.index(team))
@@ -270,123 +302,43 @@ def calculating_power_ranking(team: str, year: str, team_stats: dict, league_typ
     strs = round(sors - sdrs, 3)
     return [team, year, offense['GP'], record['wins'], record['losses'], calculate_pct(record['wins'], offense['GP']), strs, sors, sdrs, pf, pa, diff, off_fanpts, def_fanpts, fp_diff, off_gmsc, def_gmsc, diff_gmsc]
 
-def calculating_power_ranking_10(team: str, year: str, team_stats: dict, league_type: str, end_game: int, start_game = 1):
-    record = {'wins': 0, 'losses': 0}
-    offense = {'2PM': 0, '2PA': 0, '3PM': 0, '3PA': 0, 'FTM': 0, 'FTA': 0, 'ORB': 0, 'DRB': 0, 'AST': 0, 'STL': 0, 'BLK': 0, 'TOV': 0, 'PF': 0}
-    defense = {'2PM': 0, '2PA': 0, '3PM': 0, '3PA': 0, 'FTM': 0, 'FTA': 0, 'ORB': 0, 'DRB': 0, 'AST': 0, 'STL': 0, 'BLK': 0, 'TOV': 0, 'PF': 0}
-    if start_game not in team_stats:
-        return "Did not make Playoffs"
-    for game in range(start_game, end_game + 1):
-        if game not in team_stats:
-            break
-        if team_stats[game]['offense']['PTS'] > team_stats[game]['defense']["PTS"]:
-            record['wins'] += 1
-        else:
-            record['losses'] += 1
-        for index, key in enumerate(offense.keys()):
-            if team_stats[game]['offense']['PTS'] > team_stats[game]['defense']['PTS']:
-                if index >= 9:
-                    offense[key] += min(team_stats[game]['offense'][key], team_stats[game]['defense'][key])
-                    defense[key] += max(team_stats[game]['offense'][key], team_stats[game]['defense'][key])
-                    continue
-                if key[2] == "A":
-                    if min(team_stats[game]['offense'][key], team_stats[game]['defense'][key]) >= offense[key.replace('A', 'M')]:
-                        offense[key] += min(team_stats[game]['offense'][key], team_stats[game]['defense'][key])
-                        defense[key] += max(team_stats[game]['offense'][key], team_stats[game]['defense'][key])
-                    else:
-                        offense[key] += max(team_stats[game]['offense'][key], team_stats[game]['defense'][key])
-                        defense[key] += min(team_stats[game]['offense'][key], team_stats[game]['defense'][key])
-                    continue
-                offense[key] += max(team_stats[game]['offense'][key], team_stats[game]['defense'][key])
-                defense[key] += min(team_stats[game]['offense'][key], team_stats[game]['defense'][key])
+def srs_ranking(teams: list, league_data: dict, end_game: int, start_game: int):
+    start_time = time.time()
+    srs_dict = {team[0]: team[6] for team in teams}
+    team_opps = {}
+    for team in teams:
+        team_name = team[0]
+        team_opps[team_name] = []
+        for game in range(start_game, end_game + 1):
+            if game > len(league_data[team_name]):
+                break
+            team_opps[team_name].append(league_data[team_name][game]['opp'])
+    terms = []
+    solutions = []
+    for team in srs_dict:
+        row = []
+        opps = team_opps[team]
+        for opp in srs_dict:
+            if opp == team:
+                row.append(1)
+            elif opp in opps:
+                row.append(-1 / len(opps))
             else:
-                if index >= 9:
-                    offense[key] += max(team_stats[game]['offense'][key], team_stats[game]['defense'][key])
-                    defense[key] += min(team_stats[game]['offense'][key], team_stats[game]['defense'][key])
-                    continue
-                if key[2] == "A":
-                    if min(team_stats[game]['offense'][key], team_stats[game]['defense'][key]) >= defense[key.replace('A', 'M')]:
-                        offense[key] += max(team_stats[game]['offense'][key], team_stats[game]['defense'][key])
-                        defense[key] += min(team_stats[game]['offense'][key], team_stats[game]['defense'][key])
-                    else:
-                        offense[key] += min(team_stats[game]['offense'][key], team_stats[game]['defense'][key])
-                        defense[key] += max(team_stats[game]['offense'][key], team_stats[game]['defense'][key])
-                    continue
-                offense[key] += min(team_stats[game]['offense'][key], team_stats[game]['defense'][key])
-                defense[key] += max(team_stats[game]['offense'][key], team_stats[game]['defense'][key])
-
-    offense['PTS'] = offense['2PM'] * 2 + offense['3PM'] * 3 + offense['FTM']
-    defense['PTS'] = defense['2PM'] * 2 + defense['3PM'] * 3 + defense['FTM']
-    offense['FGM'] = offense['2PM'] + offense['3PM'] + offense['FTM']
-    offense['FGA'] = offense['2PA'] + offense['3PA'] + offense['FTA']
-    defense['FGM'] = defense['2PM'] + defense['3PM'] + defense['FTM']
-    defense['FGA'] = defense['2PA'] + defense['3PA'] + defense['FTA']
-    offense['GP'] = record['wins'] + record['losses']
-    defense['GP'] = offense['GP']
-    off_gmsc = game_score(offense['PTS'] / offense['GP'], offense['FGM'] / offense['GP'], offense['FGA'] / offense['GP'], offense['FTA'] / offense['GP'], offense['FTM'] / offense['GP'], offense['ORB'] / offense['GP'], offense['DRB'] / offense['GP'], offense['STL'] / offense['GP'], offense['AST'] / offense['GP'], offense['BLK'] / offense['GP'], offense['PF'] / offense['GP'], offense['TOV'] / offense['GP'])
-    def_gmsc = game_score(defense['PTS'] / defense['GP'], defense['FGM'] / defense['GP'], defense['FGA'] / defense['GP'], defense['FTA'] / defense['GP'], defense['FTM'] / defense['GP'], defense['ORB'] / defense['GP'], defense['DRB'] / defense['GP'], defense['STL'] / defense['GP'], defense['AST'] / defense['GP'], defense['BLK'] / defense['GP'], defense['PF'] / defense['GP'], defense['TOV'] / defense['GP'])
-    diff_gmsc = round(off_gmsc - def_gmsc, 1)
-    offense['FP'] = round(offense['3PM'] * 3 + offense['2PM'] * 2 + offense['FTM'] + offense['ORB'] * 0.9 + offense['DRB'] * 0.3 + offense['AST'] * 1.5 + offense['BLK'] * -2 + offense['STL'] * -2 + offense['TOV'] * -1, 1)
-    defense['FP'] = round(defense['3PM'] * 3 + defense['2PM'] * 2 + defense['FTM'] + defense['ORB'] * 0.9 + defense['DRB'] * 0.3 + defense['AST'] * 1.5 + defense['BLK'] * -2 + defense['STL'] * -2 + defense['TOV'] * -1, 1)
-    off_fanpts = round(offense['FP'] / offense['GP'], 2)
-    def_fanpts = round(defense['FP'] / defense['GP'], 2)
-    fp_diff = round(offense['FP'] / offense['GP'] - defense['FP'] / defense['GP'], 2)
-    pf = round(offense['PTS'] / offense['GP'], 1)
-    pa = round(defense['PTS'] / defense['GP'], 1)
-    diff = round(offense['PTS'] / offense['GP'] - defense['PTS'] / defense['GP'], 1)
-    sors = round((off_gmsc + off_fanpts + pf) / 3, 3)
-    sdrs = round((def_gmsc + def_fanpts + pa) / 3, 3)
-    strs = round(sors - sdrs, 3)
-    return [team, year, offense['GP'], record['wins'], record['losses'], calculate_pct(record['wins'], offense['GP']), strs, sors, sdrs, pf, pa, diff, off_fanpts, def_fanpts, fp_diff, off_gmsc, def_gmsc, diff_gmsc]
-
-def power_rankigns_00(teams: list, year: str, league_type: str, end_game: int, start_game = 1, league_stats = None):
-    power_list = []
+                row.append(0)
+        terms.append(row)
+        solutions.append(srs_dict[team])
+    solutions = list(np.linalg.solve(np.array(terms), np.array(solutions)))
+    for idx, team in enumerate(srs_dict):
+        srs_dict[team] = solutions[idx]
     for team in teams:
-        team_stats = league_stats[team][year]
-        stats = calculating_power_ranking(team, year, team_stats, league_type, end_game, start_game)
-        if stats == "Did not make Playoffs":
-            continue
-        power_list.append(stats)
-    return power_list
+        team.insert(6, round(srs_dict[team[0]], 3))
+    sorted_teams = sorted(teams, key=custom_sort, reverse=True)
+    end_time = time.time()
+    print(f"Total time it took was {end_time - start_time} seconds")
+    return sorted_teams
 
-def power_rankings_01(teams: list, year: str, league_type: str, end_game: int, start_game = 1, opened = None, league_stats = None):
-    power_list = []
-    old_league = league_type.replace('.1', '.0')
-    if year == '2020-21':
-        rank_end_game = 72
-    else:
-        rank_end_game = 82
-    standings = rank_teams(teams, year, old_league, rank_end_game, 1, opened, league_stats)
-    eastern_conf = []
-    western_conf = []
-    for team_rank in standings:
-        tm_abr = nba_teams_swapped[team_rank[1]]
-        if tm_abr in teams_list['Eastern']:
-            eastern_conf.append(tm_abr)
-        else:
-            western_conf.append(tm_abr)
-    for team in teams:
-        team_stats = league_stats[team][year]
-        if team in teams_list['Eastern']:
-            standings = eastern_conf
-        else:
-            standings = western_conf
-        new_team_stats = adding_playoff_games_for_point_ones(team, year, league_stats, team_stats, standings, end_game, start_game)
-        stats = calculating_power_ranking(team, year, new_team_stats, league_type, end_game, start_game)
-        if stats == "Did not make Playoffs":
-            continue
-        power_list.append(stats)
-    return power_list
-
-def power_rankings_10(teams: list, year: str, league_type: str, end_game:int, start_game = 1, league_stats = None):
-    power_list = []
-    for team in teams:
-        team_stats = league_stats[team][year]
-        stats = calculating_power_ranking_10(team, year, team_stats, league_type, end_game, start_game)
-        if stats == "Did not make Playoffs":
-            continue
-        power_list.append(stats)
-    return power_list
+def custom_sort(item):
+    return (item[6], item[5])
 
 #----------------------------------------------------------------
 # Player Ranking Calculations
@@ -464,9 +416,9 @@ def player_season_stats(player: str, year: str, league_type: str, end_game: int,
     return [player, year, pos, player_dict['GP'], round(player_dict_per_game['MP'], 1), round(player_dict_per_game['PTS'], 1), round(player_dict_per_game['FGM'], 1), round(player_dict_per_game['FGA'], 1), round(fg_pct, 3), round(eFG, 3), round(player_dict_per_game['2PM'], 1), round(player_dict_per_game['2PA'], 1), round(pct_2p, 3), round(player_dict_per_game['3PM'], 1), round(player_dict_per_game['3PA'], 1), round(pct_3p, 3), round(player_dict_per_game['FTM'], 1), round(player_dict_per_game['FTA'], 1), round(ft_pct, 3), round(player_dict_per_game['ORB'], 1), round(player_dict_per_game['DRB'], 1), round(trb, 1), round(player_dict_per_game['AST'], 1), round(player_dict_per_game['STL'], 1), round(player_dict_per_game['BLK'], 1), round(player_dict_per_game['TOV'], 1), round(player_dict_per_game['PF'], 1), round(player_dict_per_game['oRtg'], 1), round(player_dict_per_game['dRtg'], 1), round(player_dict_per_game['nRtg'], 1), fp, gmsc, spr]
 
 
-# teams = ['GSW', 'ATL', 'BOS', 'BRK', 'CHO', 'CHI', 'CLE', 'DAL', 'DEN', 'DET', 'HOU', 'IND', 'LAC', 'LAL', 'MEM', 'MIA', 'MIL', 'MIN', 'NOP', 'NYK', 'OKC', 'ORL', 'PHI', 'PHO', 'POR', 'SAC', 'SAS', 'TOR', 'UTA', 'WAS']
-# # # for team in teams: 
-# a = player_rankings(teams, '2023-24', '0.0', 82)
-# a = player_season_stats('Trae Young', '2023-24', '0.0', 82)
-# # a = rank_teams(teams, '2020-21', '0.0', 73, 1)
+teams = ['GSW', 'ATL', 'BOS', 'BRK', 'CHA', 'CHI', 'CLE', 'DAL', 'DEN', 'DET', 'HOU', 'IND', 'LAC', 'LAL', 'MEM', 'MIA', 'MIL', 'MIN', 'NOP', 'NYK', 'OKC', 'ORL', 'PHI', 'PHO', 'POR', 'SAC', 'SAS', 'TOR', 'UTA', 'WAS']
+# # # # # for team in teams: 
+# # a = power_rankings(teams, '2023-24', '0.0', 82)
+# # # a = player_season_stats('Trae Young', '2023-24', '0.0', 82)
+a = power_rankings(teams, '2015-16', '1.0', 82, 1)
 # print(a)

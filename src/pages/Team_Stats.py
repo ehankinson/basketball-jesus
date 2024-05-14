@@ -2,48 +2,14 @@ import sys
 import pandas as pd
 import streamlit as st
 sys.path.append('..')
-from season_data import season_stats
+from season_data import league_team_stats
 
 st.set_page_config(layout="wide")
 
-def team_stats_to_list(team: str, year: str, league_type: str, stat_type: str, end_game: int, start_game: int):
-    team_stats = season_stats(team, year, league_type, stat_type, end_game, start_game)
-    if team_stats == 'Did Not Make Playoffs':
-        return 'Did Not Make Playoffs'
-    keys = ['GP', 'PTS', 'FGM', 'FGA', 'FG%', 'eFG%','2PM', '2PA', '2P%', '3PM', '3PA', '3P%', 'FTM', 'FTA', 'FT%', 'ORB', 'DRB', 'TRB', 'AST', 'STL', 'BLK', 'TOV', 'PF']
-    team_list = [st.session_state['NBA_Teams'][team], year]
-    for key in keys:
-        if key == 'GP' or '%' in key:
-            team_list.append(team_stats[key])
-            continue
-        team_list.append(round(team_stats[key] / team_stats['GP'], 1))
-    team_list.append(round(team_stats['FP'] / team_stats['GP'], 2))
-    team_list.append(team_stats['GmSc'])
-    team_list.append(team_stats['STRS'])
-    return team_list
-
-def league_team_stats(team_list: list, season_type_opt: str, league_type: str, type: str):
-    total_stats = []
-    for team in team_list:
-        if season_type_opt == 'Post Season':
-            if year == '2020-21':
-                team_stats = team_stats_to_list(team, year, league_type, type, end_game + 72, start_game + 72)
-            else:
-                team_stats = team_stats_to_list(team, year, league_type, type, end_game + 82, start_game + 82)
-        else:
-            team_stats = team_stats_to_list(team, year, league_type, type, end_game, start_game)
-        if team_stats == 'Did Not Make Playoffs':
-            continue
-        total_stats.append(team_stats)
-    if type == 'offense':
-        sorted_team = sorted(total_stats, key=lambda x: x[27], reverse=True)
-    else:
-        sorted_team = sorted(total_stats, key=lambda x: x[27])
-    return sorted_team
 
 year = st.session_state.get('season') 
 st.header(f'Games Played in {year}')
-teams_select, season_type, buff1, buff2, buff3 = st.columns(5)
+teams_select, season_type, season, league_type  = st.columns(4)
 
 with teams_select:
     option = st.selectbox(
@@ -61,10 +27,31 @@ with teams_select:
     'Pacific': ['GSW', 'LAC', 'LAL', 'PHO', 'SAC'],
     'Southwest': ['DAL', 'HOU', 'MEM', 'NOP', 'SAS']
     }
+    if year != None and int(year[:4]) < 2014:
+        teams['League'][3] = 'CHA'
+        teams['Eastern'][3] = 'CHA'
+        teams['Southeast'][1] = 'CHA'
+    if year != None and int(year[:4]) < 2013:
+        teams['League'][18] = 'NOH'
+        teams['Western'][8] = 'NOH'
+        teams['Southwest'][3] = 'NOH'
+    if year != None and int(year[:4]) < 2011:
+        teams['League'][2] = 'NJN'
+        teams['Eastern'][2] = 'NJN'
+        teams['Atlantic'][1] = 'NJN'
     team_list = teams[option]
 
 with season_type:
     season_type_opt = st.selectbox("Games", ['Regular Season', 'Post Season', 'Regular & Post Season'])
+with season:
+    seasons = {'2023-24': 0, '2022-23': 1, '2021-22': 2, '2020-21': 3, '2019-20': 4, '2018-19': 5, '2017-18': 6, '2016-17': 7, '2015-16': 8,
+    '2014-15': 9, '2013-14': 10, '2012-13': 11, '2011-12': 12, '2010-11': 13, '2009-10': 14, '2008-09': 15, '2007-08': 16, '2006-07': 17,
+    '2005-06': 18, '2004-05': 19, '2003-04': 20, '2002-03': 21, '2001-02': 22, '2000-01': 23, '1999-00': 24, '1998-99': 25, '1997-98': 26,
+    '1996-97': 27, '1995-96': 28, '1994-95': 29, '1993-94': 30, '1992-93': 31, '1991-92': 32}
+    season = st.selectbox('Select season', list(seasons.keys()), index=None, placeholder='Select Season', key='season')
+with league_type:
+    versions = ['0.0', '0.1', '1.0', '1.1', '2.0', '2.1', '3.0', '3.1', '4.0']
+    league_type = st.selectbox("", versions, index=None, placeholder='Select League Type', key='league_type')
 if year == "2020-21":
     if season_type_opt == 'Regular Season':
         start_game, end_game = st.slider('Regular Season Games', 1, 72, value=(1, 72))
@@ -90,7 +77,7 @@ if season_type_opt == 'Post Season':
 else:
     height = 1087
 st.header("Teams Offensive Statistics")
-total_stats = league_team_stats(team_list, season_type_opt, st.session_state['league_type'],'offense')
+total_stats = league_team_stats(team_list, year, season_type_opt, st.session_state['league_type'], 'offense', end_game, start_game)
 columns = ['Teams', 'Year', 'GP', 'PTS', 'FGM', 'FGA', 'FG%', 'eFG%','2PM', '2PA', '2P%', '3PM', '3PA', '3P%', 'FTM', 'FTA', 'FT%', 'ORB', 'DRB', 'TRB', 'AST', 'STL', 'BLK', 'TOV', 'PF', 'Fantasy Points', 'Game Score', 'SORS']
 display_columns = ['Teams', 'Year', 'GP', 'PTS', 'FGM', 'FGA', 'FG%', 'eFG%', '3PM', '3PA', '3P%', 'FTM', 'FTA', 'FT%', 'ORB', 'DRB', 'TRB', 'AST', 'STL', 'BLK', 'Fantasy Points', 'Game Score', 'SORS']
 df = pd.DataFrame(total_stats, columns=columns)
@@ -101,10 +88,13 @@ st.divider()
 #----------------------------------------------------------------
 # Defensive Stats Standings
 st.header("Teams Defensive Statistics")
-total_stats = league_team_stats(team_list, season_type_opt, st.session_state['league_type'], 'defense')
+total_stats = league_team_stats(team_list, year, season_type_opt, st.session_state['league_type'], 'defense', end_game, start_game)
 columns = ['Teams', 'Year', 'GP', 'PTS', 'FGM', 'FGA', 'FG%', 'eFG%','2PM', '2PA', '2P%', '3PM', '3PA', '3P%', 'FTM', 'FTA', 'FT%', 'ORB', 'DRB', 'TRB', 'AST', 'STL', 'BLK', 'TOV', 'PF', 'Fantasy Points', 'Game Score', 'SORS']
 display_columns = ['Teams', 'Year', 'GP', 'PTS', 'FGM', 'FGA', 'FG%', 'eFG%', '3PM', '3PA', '3P%', 'FTM', 'FTA', 'FT%', 'ORB', 'DRB', 'TRB', 'AST', 'STL', 'BLK', 'Fantasy Points', 'Game Score', 'SORS']
 df = pd.DataFrame(total_stats, columns=columns)
 df = df[display_columns]
 st.dataframe(df, hide_index=True, height=height)
 st.divider()
+
+
+
