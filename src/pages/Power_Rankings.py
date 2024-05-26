@@ -91,3 +91,10 @@ df = pd.DataFrame(ranked_teams, columns=columns)
 # df = df[display_columns]
 st.dataframe(df, hide_index=True, height=1015)
 st.divider()
+
+def upper_everthing(elements: list[str]) -> list[str]:
+    return [element.upper() for element in elements]
+
+
+thing: list[int] = [1, 2, 3, 4, 5]
+word_list: list[int] = upper_everthing(thing)
