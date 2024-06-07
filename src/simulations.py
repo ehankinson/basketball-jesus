@@ -4,9 +4,10 @@ import time
 import random
 import pickle
 import numpy as np
+from tournament import bracket_generator
 
 with open(f"data/json/teams.json", "r") as j:
-    teams = json.load(j)
+    nba_teams = json.load(j)
 
 def find_game(team: str, team_bin_pct: dict, team_bins: dict, league_stats: dict, league_bin_pct: dict, league_bins: dict, side_of_ball: str):
     pct = random.random()
@@ -21,13 +22,19 @@ def find_game(team: str, team_bin_pct: dict, team_bins: dict, league_stats: dict
     for count, key in enumerate(team_bins):
         if count == team_key:
             if len(team_bins[key]) == 0:
-                game = random.choice(team_bins[list(team_bins.keys())[count - 1]])
+                keys = list(team_bins.keys())
+                key_index = keys.index(key)
+                for team_bin in range(key_index - 1, -1, -1):
+                    if len(team_bins[keys[team_bin]]) == 0:
+                        continue
+                    new_key = keys[team_bin]
+                game = random.choice(team_bins[new_key])
             else:
                 game = random.choice(team_bins[key])
             game_stats = league_stats[team][game][side_of_ball]
             break
     for count, key in enumerate(league_bins):
-        if game_stats['STRS'] < key:
+        if game_stats['STRS'] <= round(key, 3):
             game_percentile = league_bin_pct[count]
             break
     return game_stats, game_percentile
@@ -36,7 +43,7 @@ def league_bin_games(season_data: dict, side_of_ball: str):
     data = {}
     min_value = None
     max_value = None
-    for team in teams:
+    for team in nba_teams:
         if team not in season_data:
             continue
         for game in season_data[team]:
@@ -100,8 +107,6 @@ def bin_games(team: str, season_data: dict, side_of_ball: str):
         previous_key = new_key
     for game in data:
         game_value = round(data[game], 3)
-        if game_value > 158:
-            a = 5
         for key in bins.keys():
             if game_value <= key:
                 bins[key].append(game)
@@ -120,7 +125,9 @@ def simulation_game_stats(off_stats: dict, off_stats_pct: float, def_stats: dict
     for key in off_stats:
         if '%' in key or 'FP' == key or 'GmSc' == key or 'STRS' == key or 'PTS' == key or 'FGM' == key or 'FGA' == key or 'TRB' == key or 'MP' == key:
             continue
-        new_avg = int(round(off_stats[key] * off_pct + def_stats[key] * (1 - off_pct), 0))
+        max_stat = max(off_stats[key], def_stats[key])
+        min_stat = min(off_stats[key], def_stats[key])
+        new_avg = int(round(max_stat * off_pct + min_stat * (1 - off_pct), 0))
         return_stats[key] = new_avg
     return_stats['PTS'] = return_stats['2PM'] * 2 + return_stats['3PM'] * 3 + return_stats['FTM']
     return_stats['TRB'] = return_stats['ORB'] + return_stats['DRB']
@@ -245,23 +252,104 @@ def update_stats_dict(team_tot_stats: dict, team_game_stats: dict):
         else:
             team_tot_stats[key] += team_game_stats[key]
 
+def simulate_bracket(teams: list, bracket: dict[list], games_to_simulate: int):
+    playoff_stats = {}
+    for round_id in bracket:
+        if round_id != "round1":
+            for winner in winners:
+                id_pos = winner[1]
+                for game_id in bracket[round_id]:
+                    if id_pos in bracket[round_id][game_id]:
+                        if bracket[round_id][game_id][0] == id_pos:
+                            bracket[round_id][game_id][0] = winner[0]
+                        else:
+                            bracket[round_id][game_id][1] = winner[0]
+        winners = []
+        losers = []
+        for game_id in bracket[round_id]:
+            game = bracket[round_id][game_id]
+            home_team = game[0]
+            away_team = game[1]
+            if games_to_simulate == 1:
+                simulate_game()
+            else:
+                home_team_stats, away_team_stats, wins_dict = best_of(home_team[0], home_team[1], home_team[2], away_team[0], away_team[1], away_team[2], games_to_simulate)
+            for home_stats_key, away_stats_key in zip(home_team_stats, away_team_stats):
+                if home_team[0] not in playoff_stats:
+                    playoff_stats[home_team[0]] = {'offense': {}, 'defense': {}, 'record': {'wins': 0, 'losses': 0}}
+                if away_team[0] not in playoff_stats:
+                    playoff_stats[away_team[0]] = {'offense': {}, 'defense': {},  'record': {'wins': 0, 'losses': 0}}
+                if home_stats_key not in playoff_stats[home_team[0]]['offense']:
+                    playoff_stats[home_team[0]]['offense'][home_stats_key] = 0
+                if home_stats_key not in playoff_stats[away_team[0]]['defense']:
+                    playoff_stats[away_team[0]]['defense'][home_stats_key] = 0
+                if away_stats_key not in playoff_stats[away_team[0]]['offense']:
+                    playoff_stats[away_team[0]]['offense'][away_stats_key] = 0
+                if away_stats_key not in playoff_stats[home_team[0]]['defense']:
+                    playoff_stats[home_team[0]]['defense'][away_stats_key] = 0
+                playoff_stats[home_team[0]]['offense'][home_stats_key] += home_team_stats[home_stats_key]
+                playoff_stats[away_team[0]]['defense'][home_stats_key] += home_team_stats[home_stats_key]
+                playoff_stats[away_team[0]]['offense'][away_stats_key] += away_team_stats[away_stats_key]
+                playoff_stats[home_team[0]]['defense'][away_stats_key] += away_team_stats[away_stats_key]
+            home_key = f"{home_team[0]}'{home_team[1]}"
+            if wins_dict[home_key]['wins'] > wins_dict[home_key]['losses']:
+                winners.append([home_team, game_id])
+                losers.append(away_team[0])
+                print(f"The home team: {home_team[0]}'{home_team[1]}, with {wins_dict[home_key]['wins']} wins and the away team: {away_team[0]}'{away_team[1]}, with {wins_dict[home_key]['losses']} in {round_id}")
+            else:
+                winners.append([away_team, game_id])
+                losers.append(home_team[0])
+                print(f"The away team: {away_team[0]}'{away_team[1]}, with {wins_dict[home_key]['losses']} wins and the home team: {home_team[0]}'{home_team[1]}, with {wins_dict[home_key]['wins']} in {round_id}")
+            playoff_stats[home_team[0]]['record']['wins'] += wins_dict[home_key]['wins']
+            playoff_stats[home_team[0]]['record']['losses'] += wins_dict[home_key]['losses']
+            playoff_stats[away_team[0]]['record']['losses'] += wins_dict[home_key]['wins']
+            playoff_stats[away_team[0]]['record']['wins'] += wins_dict[home_key]['losses']
+    a = 5
+
 if __name__ == '__main__':
-    team1 = 'MIA'
-    team2 = 'BOS'
-    year1 = '2023-24'
-    year2 = '2023-24'
-    league_type1 = '0.0'
-    league_type2 = '0.0'
-    games = 7
+    year = '2022-23'
+    # year2 = '2016-17'
+    league_type = '2.1'
+    teams = [
+        ['HOU', '2017-18', '2.0'], 
+        ['TOR', '2017-18', '2.0'], 
+        ['BOS', '2017-18', '2.0'], 
+        ['GSW', '2017-18', '2.0'], 
+        ['POR', '2017-18', '2.0'],
+        ['PHI', '2017-18', '2.0'],
+        ['CLE', '2017-18', '2.0'], 
+        ['OKC', '2017-18', '2.0'], 
+        ['UTA', '2017-18', '2.0'], 
+        ['IND', '2017-18', '2.0'], 
+        ['MIA', '2017-18', '2.0'], 
+        ['NOP', '2017-18', '2.0'], 
+        ['SAS', '2017-18', '2.0'], 
+        ['MIL', '2017-18', '2.0'], 
+        ['WAS', '2017-18', '2.0'], 
+        ['MIN', '2017-18', '2.0']
+    ]
     start_time = time.time()
-    team1_stats, team2_stats, game_wins = best_of(team1=team1, year1=year1, league_type1=league_type1, team2=team2, year2=year2, league_type2=league_type2, games=games)
+    games = 7000
+    bracket = bracket_generator(len(teams), teams)
+    simulate_bracket(teams, bracket, games)
     end_time = time.time()
     print(f"{end_time - start_time} seconds")
-    print(f"{team1}-{team1_stats}")
-    print(f"{team2}-{team2_stats}")
-    team1_name = f"{team1}'{year1}"
-    team2_name = f"{team2}'{year2}"
-    print(f"{team1_name} has {game_wins[team1_name]['wins']} wins and {team2_name} has {game_wins[team2_name]['wins']}")
+    # team1 = 'DEN'
+    # team2 = 'NOP'
+    # year1 = '2023-24'
+    # year2 = '2023-24'
+    # league_type1 = '0.0'
+    # league_type2 = '0.0'
+    # games = 10000
+    
+    # team1_stats, team2_stats, game_wins = multi_game_simulation(team1=team1, year1=year1, league_type1=league_type1, team2=team2, year2=year2, league_type2=league_type2, games=games)
+    
+    
+    # print(f"{team1}-{team1_stats}")
+    # print(f"{team2}-{team2_stats}")
+    # team1_name = f"{team1}'{year1}"
+    # team2_name = f"{team2}'{year2}"
+    # print(f"{team1_name} has {game_wins[team1_name]['wins']} wins and {team2_name} has {game_wins[team2_name]['wins']}")
 
 
     

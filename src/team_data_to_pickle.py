@@ -1107,8 +1107,8 @@ if __name__ == '__main__':
 
     league_types = ['0.0', '0.1', '1.0', '1.1', '2.0', '2.1']#, '3.0', '3.1', '4.0']
     start = time.time()
-    start_year = 2000
-    end_year = 2002
+    start_year = 2023
+    end_year = 2024
     for year in range(start_year, end_year + 1):
         teams = []
         for team in nba_teams:
