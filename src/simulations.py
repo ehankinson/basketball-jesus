@@ -210,27 +210,34 @@ def multi_game_simulation(team1: str, year1: str, league_type1: str, team2: str,
             game_wins[f"{team1}'{year1}"]['losses'] += 1
     return team1_total_stats, team2_total_stats, game_wins
 
-def best_of(team1: str, year1: str, league_type1: str, team2: str, year2: str, league_type2: str, games: int):
+def best_of(team1: str, year1: str, league_type1: str, team2: str, year2: str, league_type2: str, games: int, teams_sim_stats = None):
     game_wins = {f"{team1}'{year1}": {'wins': 0, 'losses': 0}, f"{team2}'{year2}": {'wins': 0, 'losses': 0}}
     half_point = round(games / 2, 0)
     team1_total_stats = {}
     team2_total_stats = {}
     file_league1_type = league_type1.replace('.', '')
     file_league2_type = league_type2.replace('.', '')
-    with open(f"data/pickle/{year1} NBA Team Stats {file_league1_type}.pickle", "rb") as pkl:
-        team1_stats = pickle.load(pkl)
-    team1_league_bin_off_pct, team1_league_bins_off = league_bin_games(team1_stats, 'offense')
-    team1_league_bin_def_pct, team1_league_bins_def = league_bin_games(team1_stats, 'defense')
-    team1_bin_off_pct, team1_bins_off = bin_games(team1, team1_stats, 'offense')
-    team1_bin_def_pct, team1_bins_def = bin_games(team1, team1_stats, 'defense')
-    team1_list = [team1_league_bin_off_pct, team1_league_bins_off, team1_league_bin_def_pct, team1_league_bins_def, team1_bin_off_pct, team1_bins_off, team1_bin_def_pct, team1_bins_def, team1_stats]
-    with open(f"data/pickle/{year2} NBA Team Stats {file_league2_type}.pickle", "rb") as pkl:
-        team2_stats = pickle.load(pkl)
-    team2_league_bin_off_pct, team2_league_bins_off = league_bin_games(team2_stats, 'offense')
-    team2_league_bin_def_pct, team2_league_bins_def = league_bin_games(team2_stats, 'defense')    
-    team2_bin_off_pct, team2_bins_off = bin_games(team2, team2_stats, 'offense')
-    team2_bin_def_pct, team2_bins_def = bin_games(team2, team2_stats, 'defense')
-    team2_list = [team2_league_bin_off_pct, team2_league_bins_off, team2_league_bin_def_pct, team2_league_bins_def, team2_bin_off_pct, team2_bins_off, team2_bin_def_pct, team2_bins_def, team2_stats]
+    start_time = time.time()
+    if team1 not in teams_sim_stats:
+        with open(f"data/pickle/{year1} NBA Team Stats {file_league1_type}.pickle", "rb") as pkl:
+            team1_stats = pickle.load(pkl)
+        team1_league_bin_off_pct, team1_league_bins_off = league_bin_games(team1_stats, 'offense')
+        team1_league_bin_def_pct, team1_league_bins_def = league_bin_games(team1_stats, 'defense')
+        team1_bin_off_pct, team1_bins_off = bin_games(team1, team1_stats, 'offense')
+        team1_bin_def_pct, team1_bins_def = bin_games(team1, team1_stats, 'defense')
+        teams_sim_stats[team1] = {'off': {'stats': team1_bins_off, 'pct': team1_bin_off_pct}, 'def': {'stats': team1_bins_def, 'pct': team1_bin_def_pct}, 'league_off': {'stats': team1_league_bins_off, 'pct': team1_league_bin_off_pct}, 'league_def': {'stats': team1_league_bins_def, 'pct': team1_league_bin_def_pct}, 'league': team1_stats}
+    team1_list = [teams_sim_stats[team1]['league_off']['pct'], teams_sim_stats[team1]['league_off']['stats'], teams_sim_stats[team1]['league_def']['pct'], teams_sim_stats[team1]['league_def']['stats'], teams_sim_stats[team1]['off']['pct'], teams_sim_stats[team1]['off']['stats'], teams_sim_stats[team1]['def']['pct'], teams_sim_stats[team1]['def']['stats'], teams_sim_stats[team1]['league']]
+    if team2 not in teams_sim_stats:
+        with open(f"data/pickle/{year2} NBA Team Stats {file_league2_type}.pickle", "rb") as pkl:
+            team2_stats = pickle.load(pkl)
+        team2_league_bin_off_pct, team2_league_bins_off = league_bin_games(team2_stats, 'offense')
+        team2_league_bin_def_pct, team2_league_bins_def = league_bin_games(team2_stats, 'defense')    
+        team2_bin_off_pct, team2_bins_off = bin_games(team2, team2_stats, 'offense')
+        team2_bin_def_pct, team2_bins_def = bin_games(team2, team2_stats, 'defense')
+        teams_sim_stats[team2] = {'off': {'stats': team2_bins_off, 'pct': team2_bin_off_pct}, 'def': {'stats': team2_bins_def, 'pct': team2_bin_def_pct}, 'league_off': {'stats': team2_league_bins_off, 'pct': team2_league_bin_off_pct}, 'league_def': {'stats': team2_league_bins_def, 'pct': team2_league_bin_def_pct}, 'league': team2_stats}
+    team2_list = [teams_sim_stats[team2]['league_off']['pct'], teams_sim_stats[team2]['league_off']['stats'], teams_sim_stats[team2]['league_def']['pct'], teams_sim_stats[team2]['league_def']['stats'], teams_sim_stats[team2]['off']['pct'], teams_sim_stats[team2]['off']['stats'], teams_sim_stats[team2]['def']['pct'], teams_sim_stats[team2]['def']['stats'], teams_sim_stats[team2]['league']]
+    end_time = time.time()
+    print(f"Grabbing team bins took: {end_time - start_time} seconds")
     for _ in range(games):
         team1_game_stats, team2_game_stats = simulate_game(team1, year1, league_type1, team2, year2, league_type2, team1_list, team2_list, True)
         update_stats_dict(team1_total_stats, team1_game_stats)
@@ -254,6 +261,7 @@ def update_stats_dict(team_tot_stats: dict, team_game_stats: dict):
 
 def simulate_bracket(teams: list, bracket: dict[list], games_to_simulate: int):
     playoff_stats = {}
+    teams_sim_stats = {}
     for round_id in bracket:
         if round_id != "round1":
             for winner in winners:
@@ -273,7 +281,7 @@ def simulate_bracket(teams: list, bracket: dict[list], games_to_simulate: int):
             if games_to_simulate == 1:
                 simulate_game()
             else:
-                home_team_stats, away_team_stats, wins_dict = best_of(home_team[0], home_team[1], home_team[2], away_team[0], away_team[1], away_team[2], games_to_simulate)
+                home_team_stats, away_team_stats, wins_dict = best_of(home_team[0], home_team[1], home_team[2], away_team[0], away_team[1], away_team[2], games_to_simulate, teams_sim_stats)
             for home_stats_key, away_stats_key in zip(home_team_stats, away_team_stats):
                 if home_team[0] not in playoff_stats:
                     playoff_stats[home_team[0]] = {'offense': {}, 'defense': {}, 'record': {'wins': 0, 'losses': 0}}
@@ -311,22 +319,22 @@ if __name__ == '__main__':
     # year2 = '2016-17'
     league_type = '2.1'
     teams = [
-        ['HOU', '2017-18', '2.0'], 
-        ['TOR', '2017-18', '2.0'], 
-        ['BOS', '2017-18', '2.0'], 
-        ['GSW', '2017-18', '2.0'], 
-        ['POR', '2017-18', '2.0'],
-        ['PHI', '2017-18', '2.0'],
-        ['CLE', '2017-18', '2.0'], 
-        ['OKC', '2017-18', '2.0'], 
-        ['UTA', '2017-18', '2.0'], 
-        ['IND', '2017-18', '2.0'], 
-        ['MIA', '2017-18', '2.0'], 
-        ['NOP', '2017-18', '2.0'], 
-        ['SAS', '2017-18', '2.0'], 
-        ['MIL', '2017-18', '2.0'], 
-        ['WAS', '2017-18', '2.0'], 
-        ['MIN', '2017-18', '2.0']
+        ['HOU', '2018-19', '1.0'], 
+        ['TOR', '2018-19', '1.0'], 
+        ['BOS', '2018-19', '1.0'], 
+        ['GSW', '2018-19', '1.0'], 
+        ['POR', '2018-19', '1.0'],
+        ['PHI', '2018-19', '1.0'],
+        ['CLE', '2018-19', '1.0'], 
+        ['OKC', '2018-19', '1.0'], 
+        ['UTA', '2018-19', '1.0'], 
+        ['IND', '2018-19', '1.0'], 
+        ['MIA', '2018-19', '1.0'], 
+        ['NOP', '2018-19', '1.0'], 
+        ['SAS', '2018-19', '1.0'], 
+        ['MIL', '2018-19', '1.0'], 
+        ['WAS', '2018-19', '1.0'], 
+        ['MIN', '2018-19', '1.0']
     ]
     start_time = time.time()
     games = 7000
