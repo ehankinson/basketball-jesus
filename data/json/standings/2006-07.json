@@ -1,0 +1,36 @@
+{
+    "East": [
+        "DET",
+        "CLE",
+        "TOR",
+        "MIA",
+        "CHI",
+        "NJN",
+        "WAS",
+        "ORL",
+        "IND",
+        "PHI",
+        "CHA",
+        "NYK",
+        "ATL",
+        "MIL",
+        "BOS"
+    ],
+    "West": [
+        "DAL",
+        "PHO",
+        "SAS",
+        "UTA",
+        "HOU",
+        "DEN",
+        "LAL",
+        "GSW",
+        "LAC",
+        "NOH",
+        "SAC",
+        "POR",
+        "MIN",
+        "SEA",
+        "MEM"
+    ]
+}

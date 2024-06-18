@@ -124,7 +124,7 @@ if st.session_state['multi_game'] and st.session_state['games'].isdigit():
     num_games = int(st.session_state['games'])
     away_stats, home_stats, records = best_of(
         nba_teams[away_team]['abr'], away_year, away_type, 
-        nba_teams[home_team]['abr'], home_year, home_type, num_games
+        nba_teams[home_team]['abr'], home_year, home_type, num_games, {}, {}
     )
     st.session_state['multi_game'] = False
     games_played = True

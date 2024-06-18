@@ -1,43 +1,12 @@
+import json
 import streamlit as st
 st.set_page_config(layout="wide")
 
-st.session_state['NBA_Teams'] = {
-    "ATL": "Atlanta Hawks",
-    "BOS": "Boston Celtics",
-    "BRK": "Brooklyn Nets",
-    "CHI": "Chicago Bulls",
-    "CHA": "Charlotte Bobcats",
-    "CHO": "Charlotte Hornets",
-    "CLE": "Cleveland Cavaliers",
-    "DAL": "Dallas Mavericks",
-    "DEN": "Denver Nuggets",
-    "DET": "Detroit Pistons",
-    "GSW": "Golden State Warriors",
-    "HOU": "Houston Rockets",
-    "IND": "Indiana Pacers",
-    "LAC": "Los Angeles Clippers",
-    "LAL": "Los Angeles Lakers",
-    "MEM": "Memphis Grizzlies",
-    "MIA": "Miami Heat",
-    "MIL": "Milwaukee Bucks",
-    "MIN": "Minnesota Timberwolves",
-    "NJN": "New Jersey Nets",
-    "NOH": "New Orleans Hornets",
-    "NOP": "New Orleans Pelicans",
-    "NYK": "New York Knicks",
-    "OKC": "Oklahoma City Thunder",
-    "ORL": "Orlando Magic",
-    "PHI": "Philadelphia 76ers",
-    "PHO": "Phoenix Suns",
-    "POR": "Portland Trail Blazers",
-    "SAC": "Sacramento Kings",
-    "SAS": "San Antonio Spurs",
-    "SEA": "Seattle SuperSonics",
-    "TOR": "Toronto Raptors",
-    "UTA": "Utah Jazz",
-    "WAS": "Washington Wizards"
-}
+with open("data/json/teams.json", "r") as j:
+    NBA_TEAMS = json.load(j)
 
+
+ 
 st.title("Hello, world!")
 seasons = {'2023-24': 0, '2022-23': 1, '2021-22': 2, '2020-21': 3, '2019-20': 4, '2018-19': 5, '2017-18': 6, '2016-17': 7, '2015-16': 8,
     '2014-15': 9, '2013-14': 10, '2012-13': 11, '2011-12': 12, '2010-11': 13, '2009-10': 14, '2008-09': 15, '2007-08': 16, '2006-07': 17,
