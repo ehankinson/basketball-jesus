@@ -38,7 +38,7 @@ with season:
         seasons = st.multiselect('Select season', list(seasons.keys()),  placeholder='Select Season', key='season')
 with league_type:
     versions = ['0.0', '0.1', '1.0', '1.1', '2.0', '2.1', '3.0', '3.1', '4.0']
-    league_type = st.selectbox("", versions, index=None, placeholder='Select League Type', key='league_type')
+    league_type = st.selectbox("League Type", versions, index=None, placeholder='Select League Type', key='league_type')
 
 year = st.session_state.get('season')
 if multi_season:
@@ -74,8 +74,6 @@ if season_type_opt == 'Post Season':
 else:
     ranked_teams = power_rankings(team_list, year, st.session_state['league_type'], end_game, start_game)
 columns = ['Rank', 'Teams', 'Year', 'GP', 'Wins', 'Losses', 'Pct', 'SRS', 'STRS', 'SORS','SDRS', 'PF', 'PA', 'DIFF', 'FP For', 'FP Againts', 'Diff', 'Off GmSc', 'Def GmSc', 'Game Score Diff']
-display_columns = ['Teams', 'Year', 'GP', 'Wins', 'Losses', 'Pct', 'SRS', 'STRS', 'SORS','SDRS', 'PF', 'PA', 'DIFF', 'Fantasy Poitns For', 'Fantasy Points Againts', 'Diff', 'Off Game Score', 'Def Game Score', 'Game Score Diff']
 df = pd.DataFrame(ranked_teams, columns=columns)
-# df = df[display_columns]
 st.dataframe(df, hide_index=True, height=1015)
 st.divider()

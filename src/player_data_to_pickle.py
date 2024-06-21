@@ -51,6 +51,9 @@ def update_player_stats(new_player_dict: dict, player_stats: dict, og_game_stats
         if og_game_stats[side_of_ball][key] == 0:
             new_player_dict[key] = 0
         else:
+            if key == 'MP' and key not in needed_game_stats[side_of_ball]:
+                new_player_dict[key] = player_stats[key]
+                continue 
             new_player_dict[key] = int(round((player_stats[key] / og_game_stats[side_of_ball][key]) * needed_game_stats[side_of_ball][key], 0))
 
 
@@ -65,11 +68,11 @@ def make_00_pickle(year: int):
         pickle.dump(pickle_dump, p)
 
 def make_01_pickle(year: int):
-    player_data = {}
+    player_data = {'data': {}}
     team_inverse = {}
-    with open(f"data/json/standings/2023-24.json", "r") as j:
-        year_standings = json.load(j)
     str_year = f"{year}-{int(str(year)[2:]) + 1}"
+    with open(f"data/json/standings/{str_year}.json", "r") as j:
+        year_standings = json.load(j)
     with open(f"data/pickle/{str_year} NBA Player Stats 00.pickle", "rb") as p:
         og_player_stats = pickle.load(p)
     with open(f"data/pickle/{str_year} NBA Team Stats 00.pickle", "rb") as p:
@@ -77,16 +80,14 @@ def make_01_pickle(year: int):
     with open(f"data/pickle/{str_year} NBA Team Stats 01.pickle", "rb") as p:
         version_team_stats = pickle.load(p)
     for player in og_player_stats['data']:
-        if player == 'Miles Bridges':
-            a = 5
-        player_data[player] = {}
+        player_data['data'][player] = {}
         for team in og_player_stats['data'][player]:
-            player_data[player][team] = {}
+            player_data['data'][player][team] = {}
             for game in og_player_stats['data'][player][team]:
                 if game not in version_team_stats[team] or game not in og_team_stats[team]:
                     break
-                player_data[player][team][game] = {}
-                new_player_dict = player_data[player][team][game] 
+                player_data['data'][player][team][game] = {}
+                new_player_dict = player_data['data'][player][team][game] 
                 player_stats = og_player_stats['data'][player][team][game]
                 og_game_stats = og_team_stats[team][game]
                 needed_game_stats = version_team_stats[team][game]
@@ -105,11 +106,11 @@ def make_01_pickle(year: int):
                 game_diff = len(version_team_stats[team]) - len(og_team_stats[team])
                 game_inverse = 0
                 while game_inverse < game_diff:
-                    if (82 - game_inverse) not in player_data[player][team]:
+                    if (82 - game_inverse) not in player_data['data'][player][team]:
                         game_inverse += 1
                         continue
-                    player_data[player][team][82 + game_inverse] = {}
-                    new_player_dict = player_data[player][team][82 + game_inverse]
+                    player_data['data'][player][team][82 + game_inverse] = {}
+                    new_player_dict = player_data['data'][player][team][82 + game_inverse]
                     player_stats = og_player_stats['data'][player][team][82 - game_inverse]
                     og_game_stats = og_team_stats[team][82 - game_inverse]
                     needed_game_stats = version_team_stats[team][82 + game_inverse]
@@ -119,7 +120,69 @@ def make_01_pickle(year: int):
     with open(f"data/pickle/{str_year} NBA Player Stats 01.pickle", "wb") as p:
         pickle.dump(player_data, p)
             
+def make_10_pickle(year: int):
+    player_data = {'data': {}}
+    str_year = f"{year}-{int(str(year)[2:]) + 1}"
+    with open(f"data/pickle/{str_year} NBA Player Stats 00.pickle", "rb") as p:
+        og_player_stats = pickle.load(p)
+    with open(f"data/pickle/{str_year} NBA Team Stats 00.pickle", "rb") as p:
+        og_team_stats = pickle.load(p)
+    with open(f"data/pickle/{str_year} NBA Team Stats 10.pickle", "rb") as p:
+        version_team_stats = pickle.load(p)
+    for player in og_player_stats["data"]:
+        player_data['data'][player] = {}
+        for team in og_player_stats['data'][player]:
+            player_data['data'][player][team] = {}
+            for game in og_player_stats['data'][player][team]:
+                if game not in og_team_stats[team]:
+                    continue
+                player_data['data'][player][team][game] = {}
+                new_player_dict = player_data['data'][player][team][game]
+                player_stats = og_player_stats['data'][player][team][game]
+                og_game_stats = og_team_stats[team][game]
+                needed_game_stats = version_team_stats[team][game]
+                update_player_stats(new_player_dict, player_stats, og_game_stats, needed_game_stats)
+    player_data['pos'] = og_player_stats['pos']
+    with open(f"data/pickle/{str_year} NBA Player Stats 10.pickle", "wb") as p:
+        pickle.dump(player_data, p)
 
+def make_11_pickle(year: int):
+    player_data = {'data': {}}
+    str_year = f"{year}-{int(str(year)[2:]) + 1}"
+    with open(f"data/pickle/{str_year} NBA Player Stats 00.pickle", "rb") as p:
+        og_player_stats = pickle.load(p)
+    with open(f"data/pickle/{str_year} NBA Player Stats 01.pickle", "rb") as p:
+        inverse_og_player_stats = pickle.load(p)
+    with open(f"data/pickle/{str_year} NBA Team Stats 01.pickle", "rb") as p:
+        og_team_stats = pickle.load(p)
+    with open(f"data/pickle/{str_year} NBA Team Stats 01.pickle", "rb") as p:
+        inverse_og_team_stats = pickle.load(p)
+    with open(f"data/pickle/{str_year} NBA Team Stats 11.pickle", "rb") as p:
+        version_team_stats = pickle.load(p)
+    for player in og_player_stats["data"]:
+        player_data['data'][player] = {}
+        for team in og_player_stats['data'][player]:
+            player_data['data'][player][team] = {}
+            for game in og_player_stats['data'][player][team]:
+                if game not in og_team_stats[team]:
+                    if game not in inverse_og_team_stats[team]:
+                        continue
+                    player_data['data'][player][team][game] = {}
+                    new_player_dict = player_data['data'][player][team][game]
+                    player_stats = inverse_og_player_stats['data'][player][team][game]
+                    og_game_stats = inverse_og_team_stats[team][game]
+                    needed_game_stats = version_team_stats[team][game]
+                    update_player_stats(new_player_dict, player_stats, og_game_stats, needed_game_stats)
+                    continue
+                player_data['data'][player][team][game] = {}
+                new_player_dict = player_data['data'][player][team][game]
+                player_stats = og_player_stats['data'][player][team][game]
+                og_game_stats = og_team_stats[team][game]
+                needed_game_stats = version_team_stats[team][game]
+                update_player_stats(new_player_dict, player_stats, og_game_stats, needed_game_stats)
+    player_data['pos'] = og_player_stats['pos']
+    with open(f"data/pickle/{str_year} NBA Player Stats 11.pickle", "wb") as p:
+        pickle.dump(player_data, p)
 
 
 def make_pickles():
@@ -133,6 +196,10 @@ def make_pickles():
                     make_00_pickle(year)
                 case 1:
                     make_01_pickle(year)
+                case 2:
+                    make_10_pickle(year)
+                case 3:
+                    make_11_pickle(year)
         year += 1
 
 if __name__ == '__main__':
