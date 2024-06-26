@@ -34,85 +34,63 @@ def find_game(team: str, team_bin_pct: dict, team_bins: dict, league_stats: dict
     index = bisect.bisect_right(sorted_league_bins, round(game_stats['STRS'], 3))
     game_percentile = league_bin_pct[index] if index < len(league_bin_pct) else league_bin_pct[len(league_bin_pct) - 1]
     return game_stats, game_percentile
-   
-def league_bin_games(season_data: dict):
-    data = {}
-    min_value = None
-    max_value = None
-    for team in nba_teams:
+
+def grab_min_max_values_from_games(team: str, season_data: dict, data: dict, side_of_ball: str):
+    min_value = float('inf')
+    max_value = float('-inf')
+    if team != 'ALL':
+        teams = [team]
+    else:
+        teams = nba_teams
+    for team in teams:
         if team not in season_data:
             continue
         for game in season_data[team]:
-            game_value = season_data[team][game]['offense']['STRS']
-            if min_value == None:
-                min_value = game_value
-            if max_value == None:
-                max_value = game_value
+            game_value = season_data[team][game][side_of_ball]['STRS']
             if game_value < min_value:
                 min_value = game_value
             if game_value > max_value:
                 max_value = game_value
             data[f"{team}-{game}"] = game_value
+    return round(min_value, 3), round(max_value, 3)
+
+def calculate_histogram_data(data: dict, max_value: float, min_value: float):
     sqrt_bins = int(len(data) ** 0.5)
     difference = max_value - min_value
     bin_size = difference / sqrt_bins
-    bins = {}
-    previous_key = min_value
-    for _ in range(sqrt_bins):
-        new_key = previous_key + bin_size
-        bins[new_key] = []
-        previous_key = new_key
-    for game_key in data:
-        game_value = data[game_key]
-        for key in bins.keys():
-            if game_value <= key:
-                bins[key].append(game_value)
-                break
-    bin_pct = {}
-    total_pct = 0
-    for bin_number, key in enumerate(bins.keys()):
-        total_pct += len(bins[key]) / len(data)
-        bin_pct[bin_number] = total_pct  
-    return bin_pct, bins
+    return sqrt_bins, bin_size
 
-def bin_games(team: str, season_data: dict, side_of_ball: str):
-    data = {}
-    min_value = None
-    max_value = None
-    for game in season_data[team]:
-        game_value = season_data[team][game][side_of_ball]['STRS']
-        if min_value == None:
-            min_value = game_value
-        if max_value == None:
-            max_value = game_value
-        if game_value < min_value:
-            min_value = game_value
-        if game_value > max_value:
-            max_value = game_value
-        data[game] = round(game_value, 3)
-    min_value = round(min_value, 3)
-    max_value = round(max_value, 3)
-    sqrt_bins = int(len(data) ** 0.5)
-    difference = max_value - min_value
-    bin_size = round(difference / sqrt_bins, 3)
+def calculate_bins(min_value: float, sqrt_bins: int, bin_size: int, data: dict,):
     bins = {}
     previous_key = min_value
     for _ in range(sqrt_bins):
         new_key = round(previous_key + bin_size, 3)
         bins[new_key] = []
         previous_key = new_key
-    for game in data:
-        game_value = round(data[game], 3)
-        for key in bins.keys():
+    
+    # Assign games to bins
+    for game, value in data.items():
+        game_value = round(value, 3)
+        for key in bins:
             if game_value <= key:
                 bins[key].append(game)
                 break
+    
+    # Calculate bin percentages
     bin_pct = {}
+    total_games = len(data)
     total_pct = 0
-    for bin_number, key in enumerate(bins.keys()):
-        total_pct += len(bins[key]) / len(data)
+    for bin_number, key in enumerate(bins):
+        total_pct += len(bins[key]) / total_games
         bin_pct[bin_number] = total_pct  
+    
     return bin_pct, bins
+
+def bin_games(team: str, season_data: dict, side_of_ball: str):
+    data = {}
+    min_value, max_value = grab_min_max_values_from_games(team, season_data, data, side_of_ball)
+    sqrt_bins, bin_size = calculate_histogram_data(data, max_value, min_value)
+    return calculate_bins(min_value, sqrt_bins, bin_size, data)
 
 def simulation_game_stats(off_stats: dict, off_stats_pct: float, def_stats: dict, def_stats_pct: float):
     return_stats = {}
@@ -134,12 +112,12 @@ def simulate_game(team1: str, year1: str, league_type1: str, team2: str, year2: 
         file_league2_type = league_type2.replace('.', '')
         with open(f"data/pickle/{year1} NBA Team Stats {file_league1_type}.pickle", "rb") as pkl:
             team1_stats = pickle.load(pkl)
-        team1_league_bin_pct, team1_league_bins = league_bin_games(team1_stats)
+        team1_league_bin_pct, team1_league_bins = bin_games('ALL', team1_stats, 'offense')
         team1_bin_off_pct, team1_bins_off = bin_games(team1, team1_stats, 'offense')
         team1_bin_def_pct, team1_bins_def = bin_games(team1, team1_stats, 'defense')
         with open(f"data/pickle/{year2} NBA Team Stats {file_league2_type}.pickle", "rb") as pkl:
             team2_stats = pickle.load(pkl)
-        team2_league_bin_pct, team2_league_bins = league_bin_games(team2_stats) 
+        team2_league_bin_pct, team2_league_bins = bin_games('ALL', team1_stats, 'offense')
         team2_bin_off_pct, team2_bins_off = bin_games(team2, team2_stats, 'offense')
         team2_bin_def_pct, team2_bins_def = bin_games(team2, team2_stats, 'defense')
     else:
@@ -328,7 +306,7 @@ def populate_team_and_league_dict(teams: list):
 
         league_key = f"{year}-{league_type}"
         if league_key not in league_sim_stats:
-            team_league_bin_pct, team_league_bins = league_bin_games(team_stats)
+            team_league_bin_pct, team_league_bins = bin_games('ALL', team_stats, 'offense')
             league_sim_stats[league_key] = {'league_bins': {'stats': team_league_bins, 'pct': team_league_bin_pct}, 'league': team_stats}
     return teams_sim_stats, league_sim_stats
 
@@ -538,7 +516,7 @@ if __name__ == '__main__':
     print(len(teams))
     games = 7
     bracket = bracket_generator(len(teams), teams)
-    games = [7, 14, 28, 56, 112, 224, 448, 896, 1792, 3584, 7168, 14336, 28672, 57344, 114688]
+    games = [7]#, 14, 28, 56, 112, 224, 448, 896, 1792, 3584, 7168, 14336, 28672, 57344, 114688]
 
     game_check = []
 
