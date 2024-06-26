@@ -141,18 +141,16 @@ def multi_game_simulation(team1: str, year1: str, league_type1: str, team2: str,
     file_league2_type = league_type2.replace('.', '')
     with open(f"data/pickle/{year1} NBA Team Stats {file_league1_type}.pickle", "rb") as pkl:
         team1_stats = pickle.load(pkl)
-    team1_league_bin_off_pct, team1_league_bins_off = league_bin_games(team1_stats, 'offense')
-    team1_league_bin_def_pct, team1_league_bins_def = league_bin_games(team1_stats, 'defense')
+    team1_league_bin_off_pct, team1_league_bins_off = bin_games('ALL', team1_stats, 'offense')
     team1_bin_off_pct, team1_bins_off = bin_games(team1, team1_stats, 'offense')
     team1_bin_def_pct, team1_bins_def = bin_games(team1, team1_stats, 'defense')
-    team1_list = [team1_league_bin_off_pct, team1_league_bins_off, team1_league_bin_def_pct, team1_league_bins_def, team1_bin_off_pct, team1_bins_off, team1_bin_def_pct, team1_bins_def, team1_stats]
+    team1_list = [team1_league_bin_off_pct, team1_league_bins_off, team1_bin_off_pct, team1_bins_off, team1_bin_def_pct, team1_bins_def, team1_stats]
     with open(f"data/pickle/{year2} NBA Team Stats {file_league2_type}.pickle", "rb") as pkl:
         team2_stats = pickle.load(pkl)
-    team2_league_bin_off_pct, team2_league_bins_off = league_bin_games(team2_stats, 'offense')
-    team2_league_bin_def_pct, team2_league_bins_def = league_bin_games(team2_stats, 'defense')    
+    team2_league_bin_off_pct, team2_league_bins_off = bin_games('ALL', team1_stats, 'offense')  
     team2_bin_off_pct, team2_bins_off = bin_games(team2, team2_stats, 'offense')
     team2_bin_def_pct, team2_bins_def = bin_games(team2, team2_stats, 'defense')
-    team2_list = [team2_league_bin_off_pct, team2_league_bins_off, team2_league_bin_def_pct, team2_league_bins_def, team2_bin_off_pct, team2_bins_off, team2_bin_def_pct, team2_bins_def, team2_stats]
+    team2_list = [team2_league_bin_off_pct, team2_league_bins_off, team2_bin_off_pct, team2_bins_off, team2_bin_def_pct, team2_bins_def, team2_stats]
     for _ in range(games):
         team1_game_stats, team2_game_stats = simulate_game(team1, year1, league_type1, team2, year2, league_type2, team1_list, team2_list, True)
         update_stats_dict(team1_total_stats, team1_game_stats)
