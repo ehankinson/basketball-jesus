@@ -1,4 +1,5 @@
 import math
+import random
 
 
 def bracket_generator(number_of_teams: int, team_list: list):
@@ -65,46 +66,71 @@ def bracket_generator(number_of_teams: int, team_list: list):
         end_idx = previous_key
     return playoff_rounds
 
-
+def season_generator(teams: list, conf_games: int, div_games: int, non_conf_games: int):
+    schedule_list = []
+    for team in teams:
+        team_abr = f"{team['name']}-{team['year']} {team['league_type']}"
+        team_conf = team['conf']
+        team_div = team['div']
+        teams.pop(0)
+        for team in teams:
+            opp_abr = f"{team['name']}-{team['year']} {team['league_type']}"
+            opp_conf = team['conf']
+            opp_div = team['div']
+            if team_div == opp_div:
+                for _ in range(div_games):
+                    schedule_list.append([team_abr, 'vs', opp_abr])
+            elif team_conf == opp_conf:
+                for _ in range(conf_games):
+                    schedule_list.append([team_abr, 'vs', opp_abr])
+            else:
+                for _ in range(non_conf_games):
+                    schedule_list.append([team_abr, 'vs', opp_abr])
+    random.shuffle(schedule_list)
+    return schedule_list
 
 if __name__ == '__main__':
     # Example usage
+    year = '2023-24'
+    league_type = '0.0'
     teams = [
-        ['BOS', '2023-24', '0.0'], 
-        ['OKC', '2023-24', '0.0'], 
-        ['DEN', '2023-24', '0.0'], 
-        ['NYK', '2023-24', '0.0'], 
-        ['MIL', '2023-24', '0.0'], 
-        ['MIN', '2023-24', '0.0'], 
-        ['LAC', '2023-24', '0.0'], 
-        ['CLE', '2023-24', '0.0'], 
-        ['ORL', '2023-24', '0.0'], 
-        ['DAL', '2023-24', '0.0'], 
-        ['PHO', '2023-24', '0.0'], 
-        ['IND', '2023-24', '0.0'], 
-        ['PHI', '2023-24', '0.0'], 
-        ['NOP', '2023-24', '0.0'], 
-        ['LAL', '2023-24', '0.0'], 
-        ['MIA', '2023-24', '0.0'], 
-        ['CHI', '2023-24', '0.0'], 
-        ['SAC', '2023-24', '0.0'], 
-        ['GSW', '2023-24', '0.0'], 
-        ['ATL', '2023-24', '0.0'], 
-        ['BRK', '2023-24', '0.0'], 
-        ['HOU', '2023-24', '0.0'], 
-        ['UTA', '2023-24', '0.0'], 
-        ['TOR', '2023-24', '0.0'], 
-        ['CHO', '2023-24', '0.0'], 
-        ['MEM', '2023-24', '0.0'], 
-        ['SAS', '2023-24', '0.0'], 
-        ['WAS', '2023-24', '0.0'], 
-        ['DET', '2023-24', '0.0'], 
-        ['POR', '2023-24', '0.0']
-             ]
-    num_teams = len(teams)
-    bracket = bracket_generator(num_teams, teams)
+        {'name': 'BOS', 'year': year, 'league_type': league_type, 'conf': 'East', 'div': 'Atlantic'},
+        {'name': 'NYK', 'year': year, 'league_type': league_type, 'conf': 'East', 'div': 'Atlantic'},
+        {'name': 'PHI', 'year': year, 'league_type': league_type, 'conf': 'East', 'div': 'Atlantic'},
+        {'name': 'BRK', 'year': year, 'league_type': league_type, 'conf': 'East', 'div': 'Atlantic'},
+        {'name': 'TOR', 'year': year, 'league_type': league_type, 'conf': 'East', 'div': 'Atlantic'},
+        {'name': 'MIL', 'year': year, 'league_type': league_type, 'conf': 'East', 'div': 'Central'},
+        {'name': 'CLE', 'year': year, 'league_type': league_type, 'conf': 'East', 'div': 'Central'},
+        {'name': 'IND', 'year': year, 'league_type': league_type, 'conf': 'East', 'div': 'Central'},
+        {'name': 'CHI', 'year': year, 'league_type': league_type, 'conf': 'East', 'div': 'Central'},
+        {'name': 'DET', 'year': year, 'league_type': league_type, 'conf': 'East', 'div': 'Central'},
+        {'name': 'ORL', 'year': year, 'league_type': league_type, 'conf': 'East', 'div': 'Southeast'},
+        {'name': 'MIA', 'year': year, 'league_type': league_type, 'conf': 'East', 'div': 'Southeast'},
+        {'name': 'ATL', 'year': year, 'league_type': league_type, 'conf': 'East', 'div': 'Southeast'},
+        {'name': 'CHO', 'year': year, 'league_type': league_type, 'conf': 'East', 'div': 'Southeast'},
+        {'name': 'WAS', 'year': year, 'league_type': league_type, 'conf': 'East', 'div': 'Southeast'},
+        {'name': 'OKC', 'year': year, 'league_type': league_type, 'conf': 'West', 'div': 'Northwest'},
+        {'name': 'DEN', 'year': year, 'league_type': league_type, 'conf': 'West', 'div': 'Northwest'},
+        {'name': 'MIN', 'year': year, 'league_type': league_type, 'conf': 'West', 'div': 'Northwest'},
+        {'name': 'UTA', 'year': year, 'league_type': league_type, 'conf': 'West', 'div': 'Northwest'},
+        {'name': 'POR', 'year': year, 'league_type': league_type, 'conf': 'West', 'div': 'Northwest'},
+        {'name': 'LAC', 'year': year, 'league_type': league_type, 'conf': 'West', 'div': 'Pacific'},
+        {'name': 'PHO', 'year': year, 'league_type': league_type, 'conf': 'West', 'div': 'Pacific'},
+        {'name': 'LAL', 'year': year, 'league_type': league_type, 'conf': 'West', 'div': 'Pacific'},
+        {'name': 'SAC', 'year': year, 'league_type': league_type, 'conf': 'West', 'div': 'Pacific'},
+        {'name': 'GSW', 'year': year, 'league_type': league_type, 'conf': 'West', 'div': 'Pacific'},
+        {'name': 'DAL', 'year': year, 'league_type': league_type, 'conf': 'West', 'div': 'Southwest'},
+        {'name': 'NOP', 'year': year, 'league_type': league_type, 'conf': 'West', 'div': 'Southwest'},
+        {'name': 'HOU', 'year': year, 'league_type': league_type, 'conf': 'West', 'div': 'Southwest'},
+        {'name': 'MEM', 'year': year, 'league_type': league_type, 'conf': 'West', 'div': 'Southwest'},
+        {'name': 'SAS', 'year': year, 'league_type': league_type, 'conf': 'West', 'div': 'Southwest'}
+    ]
+
+    season_generator(teams, 4, 4, 2)
+    # num_teams = len(teams)
+    # bracket = bracket_generator(num_teams, teams)
 
     # Print the bracket structure (you can modify this to visualize the bracket)
-    print(f"Bracket for {num_teams} teams:")
-    for key in bracket:
-        print(bracket[key])
+    # print(f"Bracket for {num_teams} teams:")
+    # for key in bracket:
+    #     print(bracket[key])
