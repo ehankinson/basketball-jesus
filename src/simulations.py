@@ -36,12 +36,9 @@ def find_game(team: str, team_bin_pct: dict, team_bins: dict, league_stats: dict
     return game_stats, game_percentile
 
 def grab_min_max_values_from_games(team: str, season_data: dict, data: dict, side_of_ball: str):
+    teams = [team] if team != 'ALL' else nba_teams
     min_value = float('inf')
     max_value = float('-inf')
-    if team != 'ALL':
-        teams = [team]
-    else:
-        teams = nba_teams
     for team in teams:
         if team not in season_data:
             continue
@@ -51,7 +48,10 @@ def grab_min_max_values_from_games(team: str, season_data: dict, data: dict, sid
                 min_value = game_value
             if game_value > max_value:
                 max_value = game_value
-            data[f"{team}-{game}"] = game_value
+            if teams == "ALL":
+                data[f"{team}-{game}"] = game_value
+            else:
+                data[game] = game_value
     return round(min_value, 3), round(max_value, 3)
 
 def calculate_histogram_data(data: dict, max_value: float, min_value: float):
@@ -94,8 +94,6 @@ def bin_games(team: str, season_data: dict, side_of_ball: str):
 
 def simulation_game_stats(off_stats: dict, off_stats_pct: float, def_stats: dict, def_stats_pct: float):
     return_stats = {}
-    total_pct = off_stats_pct + def_stats_pct
-    off_pct = off_stats_pct / total_pct
     for key in off_stats:
         if key in {'%', 'FP', 'GmSc', 'STRS', 'PTS', 'FGM', 'FGA', 'TRB', 'MP'}: 
             continue
@@ -514,30 +512,7 @@ if __name__ == '__main__':
     print(len(teams))
     games = 7
     bracket = bracket_generator(len(teams), teams)
-    games = [7]#, 14, 28, 56, 112, 224, 448, 896, 1792, 3584, 7168, 14336, 28672, 57344, 114688]
-
-    game_check = []
-
-    for game in games:
-        start_time = time.time()
-        for _ in range(5):
-            return_dict, playoff_stats = simulate_bracket(teams, bracket, game)
-        end_time = time.time()
-        game_check.append(end_time - start_time)
-
-    # Plotting
-    plt.figure(figsize=(12, 8))
-
-    plt.plot(games, game_check, marker='o')
-
-    plt.title('Simulation Time for Different Number of Games')
-    plt.xlabel('Number of Games')
-    plt.ylabel('Time (seconds)')
-    plt.yscale('log')  # Set y-axis to logarithmic scale
-    plt.grid(True, which="both", ls="--")
-    plt.tight_layout()
-
-    # Show the plot
-    plt.show()
-            
+    return_dict, playoff_stats = simulate_bracket(teams, bracket, games)
+       
+                
  

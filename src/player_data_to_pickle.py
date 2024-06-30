@@ -44,7 +44,9 @@ def process_csv_file(player_file: str, player_pos: dict, player_data: dict, ):
         
 def update_player_stats(new_player_dict: dict, player_stats: dict, og_game_stats: dict, needed_game_stats: dict):
     for key in player_stats:
-        if key == 'BLK' or key == 'STL':
+        if key in ['FGA', 'FGM', 'TRB', 'PTS']:
+            continue
+        if key in ['BLK', 'STL'] :
             side_of_ball = 'defense'
         else:
             side_of_ball = 'offense'
@@ -55,7 +57,10 @@ def update_player_stats(new_player_dict: dict, player_stats: dict, og_game_stats
                 new_player_dict[key] = player_stats[key]
                 continue 
             new_player_dict[key] = int(round((player_stats[key] / og_game_stats[side_of_ball][key]) * needed_game_stats[side_of_ball][key], 0))
-
+    new_player_dict['FGM'] = new_player_dict['2PM'] + new_player_dict['3PM']
+    new_player_dict['FGA'] = new_player_dict['2PA'] + new_player_dict['3PA']
+    new_player_dict['TRB'] = new_player_dict['ORB'] + new_player_dict['DRB']
+    new_player_dict['PTS'] = new_player_dict['2PM'] * 2 + new_player_dict['3PM'] * 3 + new_player_dict['FTM']
 
 def make_00_pickle(year: int):
     player_data = {}
@@ -80,6 +85,8 @@ def make_01_pickle(year: int):
     with open(f"data/pickle/{str_year} NBA Team Stats 01.pickle", "rb") as p:
         version_team_stats = pickle.load(p)
     for player in og_player_stats['data']:
+        if player == "Victor Wembanyama":
+            a = 5
         player_data['data'][player] = {}
         for team in og_player_stats['data'][player]:
             player_data['data'][player][team] = {}

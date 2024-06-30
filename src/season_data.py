@@ -20,10 +20,13 @@ teams_list = {
     }
 
 def game_score(stats_dict: dict):
-    return round(stats_dict['PTS'] + 0.4 * stats_dict['FGM'] - 0.7 * stats_dict['FGA'] - 0.4 * (stats_dict['FTA']- stats_dict['FTM']) + 0.7 * stats_dict['ORB'] + 0.3 * stats_dict['DRB'] + stats_dict['STL'] + 0.7 * stats_dict['AST'] + 0.7 * stats_dict['BLK'] -0.4 * stats_dict['PF'] - stats_dict['TOV'], 3)
+    return round(stats_dict['PTS'] + (0.4 * stats_dict['FGM']) - (0.7 * stats_dict['FGA']) - (0.4 * (stats_dict['FTA'] - stats_dict['FTM'])) + (0.7 * stats_dict['ORB']) + (0.3 * stats_dict['DRB']) + stats_dict['STL'] + (0.7 * stats_dict['AST']) + (0.7 * stats_dict['BLK']) - (0.4 * stats_dict['PF']) - stats_dict['TOV'], 3)
 
-def fantasy_points(stats_dict: dict):
-    return round(stats_dict['3PM'] * 3 + stats_dict['2PM'] * 2 + stats_dict['FTM'] + stats_dict['ORB'] * 0.9 + stats_dict['DRB'] * 0.3 + stats_dict['AST'] * 1.5 + stats_dict['BLK'] * -2 + stats_dict['STL'] * -2 + stats_dict['TOV'] * -1, 1)
+def fantasy_points(stats_dict: dict, player_or_team: str):
+    if player_or_team == "T":
+        return round(stats_dict['3PM'] * 3 + stats_dict['2PM'] * 2 + stats_dict['FTM'] + stats_dict['ORB'] * 1.675 + stats_dict['DRB'] * 1.075 + stats_dict['AST'] * 1.5 + stats_dict['BLK'] * -2 + stats_dict['STL'] * -2 + stats_dict['TOV'] * -1, 1)
+    else:
+        return round(stats_dict['3PM'] * 3 + stats_dict['2PM'] * 2 + stats_dict['FTM'] + stats_dict['ORB'] * 1.675  + stats_dict['DRB'] * 1.075 + stats_dict['AST'] * 1.5 + stats_dict['BLK'] * 2 + stats_dict['STL'] * 2 + stats_dict['TOV'] * -1, 1)
 
 def stat_per_game(stat: int, game_path: str, stats_dict: dict):
     return stats_dict[stat] / stats_dict[game_path]
@@ -239,8 +242,8 @@ def rank_bracket_team(bracket_stats: dict):
         pf = calculate_pct(offense_stats['PTS'], games_played)
         pa = calculate_pct(defense_stats['PTS'], games_played)
         diff = pf - pa
-        off_fanpts = round(fantasy_points(offense_stats) / games_played, 2)
-        def_fanpts = round(fantasy_points(defense_stats) / games_played, 2)
+        off_fanpts = round(fantasy_points(offense_stats, "T") / games_played, 2)
+        def_fanpts = round(fantasy_points(defense_stats, "T") / games_played, 2)
         fp_diff = off_fanpts - def_fanpts
         off_gmsc = round(game_score(offense_stats) / games_played, 3)
         def_gmsc = round(game_score(defense_stats) / games_played, 3)
@@ -407,6 +410,8 @@ def player_season_stats(player: str, pos: str, year: str, league_type: str, leag
                 player_dict['GP'] = 1
                 continue
             player_dict['GP'] += 1
+    if player == "Victor Wembanyama":
+        a = 5
     player_dict['FG%'] = calculate_pct(player_dict['FGM'], player_dict['FGA'])
     player_dict['2P%'] = calculate_pct(player_dict['2PM'], player_dict['2PA'])
     player_dict['3P%'] = calculate_pct(player_dict['3PM'], player_dict['3PA'])
@@ -421,7 +426,7 @@ def player_season_stats(player: str, pos: str, year: str, league_type: str, leag
     # off_stats = season_stats(team, year, league_type, 'offense', end_game, start_game)
     # def_stats = season_stats(team, year, league_type, 'defense', end_game, start_game)
     # advanced_stats = calculate_player_advanced_stats(player_dict, off_stats, def_stats)
-    fp = fantasy_points(player_dict_per_game)
+    fp = fantasy_points(player_dict_per_game, "P")
     gmsc = game_score(player_dict_per_game)
     spr = round((fp * 0.25 + gmsc * 0.75), 3)
     return [player, year, pos, player_dict['GP'], round(player_dict_per_game['MP'], 1), round(player_dict_per_game['PTS'], 1), round(player_dict_per_game['FGM'], 1), round(player_dict_per_game['FGA'], 1), round(player_dict['FG%'], 3), round(player_dict['eFG%'], 3), round(player_dict_per_game['2PM'], 1), round(player_dict_per_game['2PA'], 1), round(player_dict['2P%'], 3), round(player_dict_per_game['3PM'], 1), round(player_dict_per_game['3PA'], 1), round(player_dict['3P%'], 3), round(player_dict_per_game['FTM'], 1), round(player_dict_per_game['FTA'], 1), round(player_dict['FT%'], 3), round(player_dict_per_game['ORB'], 1), round(player_dict_per_game['DRB'], 1), round(player_dict_per_game['TRB'], 1), round(player_dict_per_game['AST'], 1), round(player_dict_per_game['STL'], 1), round(player_dict_per_game['BLK'], 1), round(player_dict_per_game['TOV'], 1), round(player_dict_per_game['PF'], 1), fp, gmsc, spr]
