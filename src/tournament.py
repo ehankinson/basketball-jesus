@@ -80,7 +80,10 @@ def double_bracket_generator(team_list: list):
     round_count = 0
     count = 1
     previous_round = None
-    grab_winners = False
+    if remainder == 0:
+        grab_winners = True
+    else:
+        grab_winners = False
     while round_count < amount_of_rounds:
         loser_keys = list(losers_bracket.keys())
         round_id = f"round{count}"
@@ -106,10 +109,13 @@ def double_bracket_generator(team_list: list):
             end_idx = len(games[round_id]) - remainder - 1
             while start_idx < end_idx:
                 key = len(losers_bracket[round_id])
-                losers_bracket[round_id][key] = [start_idx, end_idx]
+                losers_bracket[round_id][key] = [f"{start_idx}_w", f"{end_idx}_w"]
                 end_idx -= 1
                 start_idx += 1
-            previous_round = 2
+            if 'round2' in losers_bracket:
+                previous_round = 2
+            else:
+                previous_round = 1
             round_count += 1
             count += 1
         elif int(math.log2(len(losers_bracket[loser_keys[-previous_round]]))) == math.log2(len(losers_bracket[loser_keys[-previous_round]])):

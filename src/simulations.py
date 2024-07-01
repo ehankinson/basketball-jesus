@@ -224,7 +224,7 @@ def run_sim_in_parallel(edit_bracket: dict, round_id: int, winners: list, losers
             playoff_stats[away_key]['record']['wins'] += wins_dict[wins_key]['losses']
             return_dict[round_id][game_id] = {'winner': winners[-1][0][0], 'winner_year': win_year, 'wins': max(wins_dict[wins_key]['wins'], wins_dict[wins_key]['losses']), 'loser': losers[-1], 'loser_year': lose_year, 'losses': min(wins_dict[wins_key]['wins'], wins_dict[wins_key]['losses'])}
         
-def run_single_thread(edit_bracket: dict, round_id: str, winners: list, losers: list, games_to_simulate: int, teams_sim_stats: dict, league_sim_stats: dict, playoff_stats: dict, return_dict: dict):
+def run_single_thread(edit_bracket: dict, round_id: str, winners: list, losers: list, games_to_simulate: int, teams_sim_stats: dict, league_sim_stats: dict, playoff_stats: dict, return_dict: dict, double_elim = False, win_or_lose = None):
     for game_id in edit_bracket[round_id]:
         game = edit_bracket[round_id][game_id]
         home_team = game[0]
@@ -233,14 +233,16 @@ def run_single_thread(edit_bracket: dict, round_id: str, winners: list, losers: 
         home_key = f"{home_team[0]}-{home_team[1]}-{home_team[2]}"
         away_key = f"{away_team[0]}-{away_team[1]}-{away_team[2]}"
         two_team_update_dict(home_key, away_key, home_team, away_team, home_team_stats, away_team_stats, playoff_stats)
-        win_year, lose_year = check_round_winner(home_key, away_key, home_team, away_team, wins_dict, edit_bracket, playoff_stats, winners, losers, round_id, game_id)
+        win_year, lose_year = check_round_winner(home_key, away_key, home_team, away_team, wins_dict, edit_bracket, playoff_stats, winners, losers, round_id, game_id, win_or_lose)
         wins_key = f"{home_team[0]}'{home_team[1]}"
         playoff_stats[home_key]['record']['wins'] += wins_dict[wins_key]['wins']
         playoff_stats[home_key]['record']['losses'] += wins_dict[wins_key]['losses']
         playoff_stats[away_key]['record']['losses'] += wins_dict[wins_key]['wins']
         playoff_stats[away_key]['record']['wins'] += wins_dict[wins_key]['losses']
-        return_dict[round_id][game_id] = {'winner': winners[-1][0][0], 'winner_year': win_year, 'wins': max(wins_dict[wins_key]['wins'], wins_dict[wins_key]['losses']), 'loser': losers[-1], 'loser_year': lose_year, 'losses': min(wins_dict[wins_key]['wins'], wins_dict[wins_key]['losses'])}
-
+        if not double_elim:
+            return_dict[round_id][game_id] = {'winner': winners[-1][0][0], 'winner_year': win_year, 'wins': max(wins_dict[wins_key]['wins'], wins_dict[wins_key]['losses']), 'loser': losers[-1], 'loser_year': lose_year, 'losses': min(wins_dict[wins_key]['wins'], wins_dict[wins_key]['losses'])}
+        else:
+            return_dict[win_or_lose][round_id][game_id] = {'winner': winners[-1][0][0], 'winner_year': win_year, 'winner_league_type': winners[-1][0][2], 'wins': max(wins_dict[wins_key]['wins'], wins_dict[wins_key]['losses']), 'loser': losers[-1], 'loser_year': lose_year, 'losses': min(wins_dict[wins_key]['wins'], wins_dict[wins_key]['losses'])}
 def simulate_bracket(teams: list, bracket: dict[list], games_to_simulate: int):
     playoff_stats = {}
     return_dict = {}
@@ -255,27 +257,118 @@ def simulate_bracket(teams: list, bracket: dict[list], games_to_simulate: int):
                     if id_pos in edit_bracket[round_id][game_id]:
                         if edit_bracket[round_id][game_id][0] == id_pos:
                             edit_bracket[round_id][game_id][0] = winner[0]
+                            break
                         else:
                             edit_bracket[round_id][game_id][1] = winner[0]
+                            break
                 del teams_sim_stats[f"{loser[0]}-{loser[1]}-{loser[2]}"]
         winners = []
         losers = []
         simulate_games(games_to_simulate, round_id, winners, losers, edit_bracket, teams_sim_stats, league_sim_stats, playoff_stats, return_dict)
     return return_dict, playoff_stats
 
-def simulate_games(games_to_simulate: int, round_id: str, winners: list, losers: list, edit_bracket: dict, teams_sim_stats: dict, league_sim_stats: dict, playoff_stats: dict, return_dict: dict):
+def simulate_double_elimination_bracket(teams: list, winners_bracket: dict, losers_bracket: dict, games_to_simulate: int):
+    playoff_stats = {}
+    return_dict = {'winner': {}, 'loser': {}}
+    edit_winner_bracket = copy.deepcopy(winners_bracket)
+    edit_loser_bracket = copy.deepcopy(losers_bracket)
+    teams_sim_stats, league_sim_stats = populate_team_and_league_dict(teams)
+    winner_count = 0
+    losers_count = 0
+    simulate_loser = False
+    change_top_bracket = True
+    while winner_count <= len(winners_bracket) and losers_count <= len(losers_bracket):
+        if winner_count == len(winners_bracket) and losers_count == len(losers_bracket):
+            return_dict['grand_finals'] = {}
+            win_short_cut = return_dict['winner'][f"round{winner_count}"]
+            win_team_key = list(win_short_cut.keys())[0]
+            winner_team = [win_short_cut[win_team_key]['winner'], win_short_cut[win_team_key]['winner_year'], win_short_cut[win_team_key]['winner_league_type']]
+            loser_short_cut = return_dict['loser'][f"round{losers_count}"]
+            lose_team_key = list(loser_short_cut.keys())[0]
+            loser_team = [loser_short_cut[lose_team_key]['winner'], loser_short_cut[lose_team_key]['winner_year'], loser_short_cut[lose_team_key]['winner_league_type']]
+            grand_finals = {'grand_finals': {max(win_team_key, lose_team_key) + 1: [winner_team, loser_team]}}
+            simulate_games(games_to_simulate, 'grand_finals', [], [], grand_finals, teams_sim_stats, league_sim_stats, playoff_stats, return_dict)
+            break
+        winner_key = f"round{winner_count + 1}"
+        loser_key = f"round{losers_count + 1}"
+        # putting the winners in the next round, and losers in the correct stop in losers bracket
+        if winner_key != 'round1':
+            if change_top_bracket:
+                for winner, loser in zip(win_bracket_winners, win_bracket_lossers):
+                    # grabing the game id
+                    id_pos = winner[1]
+                    # finding which game in the round to put the winning team in
+                    if winner_count != len(winners_bracket):
+                        for game_id in edit_winner_bracket[winner_key]:
+                            if id_pos in edit_winner_bracket[winner_key][game_id]:
+                                if edit_winner_bracket[winner_key][game_id][0] == id_pos:
+                                    edit_winner_bracket[winner_key][game_id][0] = winner[0]
+                                    break
+                                else:
+                                    edit_winner_bracket[winner_key][game_id][1] = winner[0]
+                                    break
+                    # finding which game in the round to put the losing team in the losers bracket
+                    for game_id in edit_loser_bracket[loser_key]:
+                        if isinstance(edit_loser_bracket[loser_key][game_id][0], str):
+                            edit_loser_bracket[loser_key][game_id][0] = int(edit_loser_bracket[loser_key][game_id][0].replace("_w", ""))
+                        if isinstance(edit_loser_bracket[loser_key][game_id][1], str):
+                            edit_loser_bracket[loser_key][game_id][1] = int(edit_loser_bracket[loser_key][game_id][1].replace("_w", ""))
+                        if id_pos in edit_loser_bracket[loser_key][game_id]:
+                            if edit_loser_bracket[loser_key][game_id][0] == id_pos:
+                                edit_loser_bracket[loser_key][game_id][0] = loser
+                                break
+                            else:
+                                edit_loser_bracket[loser_key][game_id][1] = loser
+                                break
+            else:
+                for winner, loser in zip(lose_bracket_winners, lose_bracket_lossers):
+                    id_pos = winner[1]
+                    for game_id in edit_loser_bracket[loser_key]:
+                        if id_pos in edit_loser_bracket[loser_key][game_id]:
+                            if edit_loser_bracket[loser_key][game_id][0] == id_pos:
+                                edit_loser_bracket[loser_key][game_id][0] = winner[0]
+                                break
+                            else:
+                                edit_loser_bracket[loser_key][game_id][1] = winner[0]
+                                break
+                    del teams_sim_stats[f"{loser[0]}-{loser[1]}-{loser[2]}"]
+        win_bracket_winners = []
+        win_bracket_lossers = []
+        lose_bracket_winners = []
+        lose_bracket_lossers = []
+        if not simulate_loser:
+            return_dict['winner'][winner_key] = {}
+            simulate_games(games_to_simulate, winner_key, win_bracket_winners, win_bracket_lossers, edit_winner_bracket, teams_sim_stats, league_sim_stats, playoff_stats, return_dict, True, 'winner')
+            winner_count += 1
+            simulate_loser = True
+            change_top_bracket = True
+        else:
+            return_dict['loser'][loser_key] = {}
+            simulate_games(games_to_simulate, loser_key, lose_bracket_winners, lose_bracket_lossers, edit_loser_bracket, teams_sim_stats, league_sim_stats, playoff_stats, return_dict, True, 'loser')
+            losers_count += 1
+            if losers_count != len(losers_bracket):
+                loser_key = f"round{losers_count + 1}"
+                check_key = list(edit_loser_bracket[loser_key].keys())[0]
+                if isinstance(edit_loser_bracket[loser_key][check_key][0], str) or isinstance(edit_loser_bracket[loser_key][check_key][1], str):
+                    simulate_loser = False
+                    change_top_bracket = False
+                else:
+                    simulate_loser = True
+                    change_top_bracket = False
+
+def simulate_games(games_to_simulate: int, round_id: str, winners: list, losers: list, edit_bracket: dict, teams_sim_stats: dict, league_sim_stats: dict, playoff_stats: dict, return_dict: dict, double_elim = False, win_or_lose = None):
     if games_to_simulate <= 4500:
-        run_single_thread(edit_bracket, round_id, winners, losers, games_to_simulate, teams_sim_stats, league_sim_stats, playoff_stats, return_dict)
+        run_single_thread(edit_bracket, round_id, winners, losers, games_to_simulate, teams_sim_stats, league_sim_stats, playoff_stats, return_dict, double_elim, win_or_lose)
     elif games_to_simulate >= 10000:
         if len(edit_bracket[round_id]) > 1:
             run_sim_in_parallel(edit_bracket, round_id, winners, losers, games_to_simulate, teams_sim_stats, league_sim_stats, playoff_stats, return_dict)
         else:
-            run_single_thread(edit_bracket, round_id, winners, losers, games_to_simulate, teams_sim_stats, league_sim_stats, playoff_stats, return_dict)
+            run_single_thread(edit_bracket, round_id, winners, losers, games_to_simulate, teams_sim_stats, league_sim_stats, playoff_stats, return_dict, double_elim, win_or_lose)
     else:
         if len(edit_bracket[round_id]) > 16: 
             run_sim_in_parallel(edit_bracket, round_id, winners, losers, games_to_simulate, teams_sim_stats, league_sim_stats, playoff_stats, return_dict)
         else:
-            run_single_thread(edit_bracket, round_id, winners, losers, games_to_simulate, teams_sim_stats, league_sim_stats, playoff_stats, return_dict)
+            run_single_thread(edit_bracket, round_id, winners, losers, games_to_simulate, teams_sim_stats, league_sim_stats, playoff_stats, return_dict, double_elim, win_or_lose)
 
 def populate_team_and_league_dict(teams: list):
     if isinstance(teams, dict):
@@ -321,32 +414,44 @@ def two_team_update_dict(home_key: str, away_key: str, home_team: list, away_tea
         playoff_stats[away_key]['offense'][away_stats_key] += away_team_stats[away_stats_key]
         playoff_stats[home_key]['defense'][away_stats_key] += away_team_stats[away_stats_key]
 
-def check_round_winner(home_key: str, away_key: str, home_team: list, away_team: list, wins_dict: dict, edit_bracket: dict, playoff_stats: dict, winners: list, losers: list, round_id: str, game_id: int):
+def check_round_winner(home_key: str, away_key: str, home_team: list, away_team: list, wins_dict: dict, edit_bracket: dict, playoff_stats: dict, winners: list, losers: list, round_id: str, game_id: int, win_or_lose = None):
     wins_key = f"{home_team[0]}'{home_team[1]}"
     if wins_dict[wins_key]['wins'] > wins_dict[wins_key]['losses']:
         winners.append([home_team, game_id])
         losers.append(away_team)
         win_year = home_team[1]
         lose_year = away_team[1]
-        if int(round_id[-1]) == len(edit_bracket) - 1:
+        if round_id == 'grand_finals':
+            playoff_stats[home_key]['record']['best_round'] = round_id
+            playoff_stats[away_key]['record']['best_round'] = round_id
+        elif int(round_id[-1]) == len(edit_bracket) - 1:
             playoff_stats[home_key]['record']['best_round'] = f"won {round_id}"
             playoff_stats[away_key]['record']['best_round'] = f"loss {round_id}"
         else:
             playoff_stats[home_key]['record']['best_round'] = round_id
             playoff_stats[away_key]['record']['best_round'] = round_id
-        game_string = f"The home team: {home_team[0]}'{home_team[1]} {home_team[2]}, with {wins_dict[wins_key]['wins']} wins and the away team: {away_team[0]}'{away_team[1]} {away_team[2]}, with {wins_dict[wins_key]['losses']} in {round_id}\n"
+        if win_or_lose == None:
+            game_string = f"The home team: {home_team[0]}'{home_team[1]} {home_team[2]}, with {wins_dict[wins_key]['wins']} wins and the away team: {away_team[0]}'{away_team[1]} {away_team[2]}, with {wins_dict[wins_key]['losses']} in {round_id}\n"
+        else:
+            game_string = f"The home team: {home_team[0]}'{home_team[1]} {home_team[2]}, with {wins_dict[wins_key]['wins']} wins and the away team: {away_team[0]}'{away_team[1]} {away_team[2]}, with {wins_dict[wins_key]['losses']} in {round_id} {win_or_lose}\n"
     else:
         winners.append([away_team, game_id])
         losers.append(home_team)
         win_year = away_team[1]
         lose_year = home_team[1]
-        if int(round_id[-1]) == len(edit_bracket) - 1:
+        if round_id == 'grand_finals':
+            playoff_stats[home_key]['record']['best_round'] = round_id
+            playoff_stats[away_key]['record']['best_round'] = round_id
+        elif int(round_id[-1]) == len(edit_bracket) - 1:
             playoff_stats[home_key]['record']['best_round'] = f"loss {round_id}"
             playoff_stats[away_key]['record']['best_round'] = f"won {round_id}"
         else:
             playoff_stats[home_key]['record']['best_round'] = round_id
             playoff_stats[away_key]['record']['best_round'] = round_id
-        game_string = f"The away team: {away_team[0]}'{away_team[1]} {away_team[2]}, with {wins_dict[wins_key]['losses']} wins and the home team: {home_team[0]}'{home_team[1]} {home_team[2]}, with {wins_dict[wins_key]['wins']} in {round_id}\n"
+        if win_or_lose == None:
+            game_string = f"The home team: {away_team[0]}'{away_team[1]} {away_team[2]}, with {wins_dict[wins_key]['losses']} wins and the away team: {home_team[0]}'{home_team[1]} {home_team[2]}, with {wins_dict[wins_key]['wins']} in {round_id}\n"
+        else:
+            game_string = f"The away team: {away_team[0]}'{away_team[1]} {away_team[2]}, with {wins_dict[wins_key]['losses']} wins and the home team: {home_team[0]}'{home_team[1]} {home_team[2]}, with {wins_dict[wins_key]['wins']} in {round_id} {win_or_lose}\n"
     print(game_string)
     return win_year, lose_year
 
@@ -374,138 +479,27 @@ def multi_bracket_sim(teams: list, amount_of_bracket_sims: int, series_length: i
 
 if __name__ == '__main__':
     teams = [
-        ['BOS', '2023-24', '0.0'],
-        ['OKC', '2023-24', '0.0'],
-        ['DEN', '2023-24', '0.0'],
-        ['NYK', '2023-24', '0.0'],
-        ['MIL', '2023-24', '0.0'],
-        ['MIN', '2023-24', '0.0'],
-        ['LAC', '2023-24', '0.0'],
-        ['CLE', '2023-24', '0.0'],
-        ['ORL', '2023-24', '0.0'],
-        ['DAL', '2023-24', '0.0'],
-        ['PHO', '2023-24', '0.0'],
-        ['IND', '2023-24', '0.0'],
-        ['PHI', '2023-24', '0.0'],
-        ['LAL', '2023-24', '0.0'],
-        ['NOP', '2023-24', '0.0'],
-        ['MIA', '2023-24', '0.0'],
-        ['BOS', '2022-23', '0.0'],
-        ['OKC', '2022-23', '0.0'],
-        ['DEN', '2022-23', '0.0'],
-        ['NYK', '2022-23', '0.0'],
-        ['MIL', '2022-23', '0.0'],
-        ['MIN', '2022-23', '0.0'],
-        ['LAC', '2022-23', '0.0'],
-        ['CLE', '2022-23', '0.0'],
-        ['ORL', '2022-23', '0.0'],
-        ['DAL', '2022-23', '0.0'],
-        ['PHO', '2022-23', '0.0'],
-        ['IND', '2022-23', '0.0'],
-        ['PHI', '2022-23', '0.0'],
-        ['LAL', '2022-23', '0.0'],
-        ['NOP', '2022-23', '0.0'],
-        ['MIA', '2022-23', '0.0'],
-        ['BOS', '2021-22', '0.0'],
-        ['OKC', '2021-22', '0.0'],
-        ['DEN', '2021-22', '0.0'],
-        ['NYK', '2021-22', '0.0'],
-        ['MIL', '2021-22', '0.0'],
-        ['MIN', '2021-22', '0.0'],
-        ['LAC', '2021-22', '0.0'],
-        ['CLE', '2021-22', '0.0'],
-        ['ORL', '2021-22', '0.0'],
-        ['DAL', '2021-22', '0.0'],
-        ['PHO', '2021-22', '0.0'],
-        ['IND', '2021-22', '0.0'],
-        ['PHI', '2021-22', '0.0'],
-        ['LAL', '2021-22', '0.0'],
-        ['NOP', '2021-22', '0.0'],
-        ['MIA', '2021-22', '0.0'],
-        ['BOS', '2020-21', '0.0'],
-        ['OKC', '2020-21', '0.0'],
-        ['DEN', '2020-21', '0.0'],
-        ['NYK', '2020-21', '0.0'],
-        ['MIL', '2020-21', '0.0'],
-        ['MIN', '2020-21', '0.0'],
-        ['LAC', '2020-21', '0.0'],
-        ['CLE', '2020-21', '0.0'],
-        ['ORL', '2020-21', '0.0'],
-        ['DAL', '2020-21', '0.0'],
-        ['PHO', '2020-21', '0.0'],
-        ['IND', '2020-21', '0.0'],
-        ['PHI', '2020-21', '0.0'],
-        ['LAL', '2020-21', '0.0'],
-        ['NOP', '2020-21', '0.0'],
-        ['MIA', '2020-21', '0.0'],
-        ['BOS', '2018-19', '0.0'],
-        ['OKC', '2018-19', '0.0'],
-        ['DEN', '2018-19', '0.0'],
-        ['NYK', '2018-19', '0.0'],
-        ['MIL', '2018-19', '0.0'],
-        ['MIN', '2018-19', '0.0'],
-        ['LAC', '2018-19', '0.0'],
-        ['CLE', '2018-19', '0.0'],
-        ['ORL', '2018-19', '0.0'],
-        ['DAL', '2018-19', '0.0'],
-        ['PHO', '2018-19', '0.0'],
-        ['IND', '2018-19', '0.0'],
-        ['PHI', '2018-19', '0.0'],
-        ['LAL', '2018-19', '0.0'],
-        ['NOP', '2018-19', '0.0'],
-        ['MIA', '2018-19', '0.0'],
-        ['BOS', '2017-18', '0.0'],
-        ['OKC', '2017-18', '0.0'],
-        ['DEN', '2017-18', '0.0'],
-        ['NYK', '2017-18', '0.0'],
-        ['MIL', '2017-18', '0.0'],
-        ['MIN', '2017-18', '0.0'],
-        ['LAC', '2017-18', '0.0'],
-        ['CLE', '2017-18', '0.0'],
-        ['ORL', '2017-18', '0.0'],
-        ['DAL', '2017-18', '0.0'],
-        ['PHO', '2017-18', '0.0'],
-        ['IND', '2017-18', '0.0'],
-        ['PHI', '2017-18', '0.0'],
-        ['LAL', '2017-18', '0.0'],
-        ['NOP', '2017-18', '0.0'],
-        ['MIA', '2017-18', '0.0'],
-        ['BOS', '2016-17', '0.0'],
-        ['OKC', '2016-17', '0.0'],
-        ['DEN', '2016-17', '0.0'],
-        ['NYK', '2016-17', '0.0'],
-        ['MIL', '2016-17', '0.0'],
-        ['MIN', '2016-17', '0.0'],
-        ['LAC', '2016-17', '0.0'],
-        ['CLE', '2016-17', '0.0'],
-        ['ORL', '2016-17', '0.0'],
-        ['DAL', '2016-17', '0.0'],
-        ['PHO', '2016-17', '0.0'],
-        ['IND', '2016-17', '0.0'],
-        ['PHI', '2016-17', '0.0'],
-        ['LAL', '2016-17', '0.0'],
-        ['NOP', '2016-17', '0.0'],
-        ['MIA', '2016-17', '0.0'],
-        ['BOS', '2015-16', '0.0'],
-        ['OKC', '2015-16', '0.0'],
-        ['DEN', '2015-16', '0.0'],
-        ['NYK', '2015-16', '0.0'],
-        ['MIL', '2015-16', '0.0'],
-        ['MIN', '2015-16', '0.0'],
-        ['LAC', '2015-16', '0.0'],
-        ['CLE', '2015-16', '0.0'],
-        ['ORL', '2015-16', '0.0'],
-        ['DAL', '2015-16', '0.0'],
-        ['PHO', '2015-16', '0.0'],
-        ['IND', '2015-16', '0.0'],
-        ['PHI', '2015-16', '0.0'],
-        ['LAL', '2015-16', '0.0'],
-        ['NOP', '2015-16', '0.0'],
-        ['MIA', '2015-16', '0.0'],
+        ['GSW', '2016-17', '1.0'],
+        ['SAS', '2015-16', '1.0'],
+        ['GSW', '2014-15', '1.0'],
+        ['BOS', '2023-24', '1.0'],
+        ['GSW', '2015-16', '1.0'],
+        ['BOS', '2007-08', '1.0'],
+        ['GSW', '2017-18', '1.0'],
+        ['CLE', '2008-09', '1.0'],
+        ['SAS', '2013-14', '1.0'],
+        ['MIL', '2018-19', '1.0'],
+        ['SAS', '2004-05', '1.0'],
+        ['UTA', '2007-08', '1.0'],
+        ['MIA', '2012-13', '1.0'],
+        ['OKC', '2012-13', '1.0'],
+        ['DET', '2007-08', '1.0'],
+        ['SAS', '2003-04', '1.0'],
     ]
     print(len(teams))
-    games = 7
-    bracket = bracket_generator(len(teams), teams)
+    games = 4500
+    winners, losers = double_bracket_generator(teams)
+    simulate_double_elimination_bracket(teams, winners, losers, games)
    
             
  
