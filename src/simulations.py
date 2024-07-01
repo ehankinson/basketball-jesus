@@ -1,19 +1,13 @@
-import concurrent.futures
-import csv
 import copy
 import json
 import time
 import bisect
 import random
 import pickle
-import timeit
-import numpy as np
-from threading import Thread
-from tournament import bracket_generator
-from season_data import rank_bracket_team
-from concurrent.futures import ThreadPoolExecutor, as_completed
 import concurrent
-import matplotlib.pyplot as plt
+import concurrent.futures
+from season_data import rank_bracket_team
+from tournament import bracket_generator, double_bracket_generator
 
 with open(f"data/json/teams.json", "r") as j:
     nba_teams = json.load(j)
@@ -512,7 +506,6 @@ if __name__ == '__main__':
     print(len(teams))
     games = 7
     bracket = bracket_generator(len(teams), teams)
-    return_dict, playoff_stats = simulate_bracket(teams, bracket, games)
-       
-                
+   
+            
  
