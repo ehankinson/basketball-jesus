@@ -1,19 +1,13 @@
-import concurrent.futures
-import csv
 import copy
 import json
 import time
 import bisect
 import random
 import pickle
-import timeit
-import numpy as np
-from threading import Thread
-from tournament import bracket_generator
-from season_data import rank_bracket_team
-from concurrent.futures import ThreadPoolExecutor, as_completed
 import concurrent
-import matplotlib.pyplot as plt
+import concurrent.futures
+from season_data import rank_bracket_team
+from tournament import bracket_generator, double_bracket_generator
 
 with open(f"data/json/teams.json", "r") as j:
     nba_teams = json.load(j)
@@ -116,8 +110,6 @@ def bin_games(team: str, season_data: dict, side_of_ball: str):
 
 def simulation_game_stats(off_stats: dict, off_stats_pct: float, def_stats: dict, def_stats_pct: float):
     return_stats = {}
-    total_pct = off_stats_pct + def_stats_pct
-    off_pct = off_stats_pct / total_pct
     for key in off_stats:
         if key in {'%', 'FP', 'GmSc', 'STRS', 'PTS', 'FGM', 'FGA', 'TRB', 'MP'}: 
             continue
@@ -538,30 +530,6 @@ if __name__ == '__main__':
     print(len(teams))
     games = 7
     bracket = bracket_generator(len(teams), teams)
-    games = [7, 14, 28, 56, 112, 224, 448, 896, 1792, 3584, 7168, 14336, 28672, 57344, 114688]
-
-    game_check = []
-
-    for game in games:
-        start_time = time.time()
-        for _ in range(5):
-            return_dict, playoff_stats = simulate_bracket(teams, bracket, game)
-        end_time = time.time()
-        game_check.append(end_time - start_time)
-
-    # Plotting
-    plt.figure(figsize=(12, 8))
-
-    plt.plot(games, game_check, marker='o')
-
-    plt.title('Simulation Time for Different Number of Games')
-    plt.xlabel('Number of Games')
-    plt.ylabel('Time (seconds)')
-    plt.yscale('log')  # Set y-axis to logarithmic scale
-    plt.grid(True, which="both", ls="--")
-    plt.tight_layout()
-
-    # Show the plot
-    plt.show()
+   
             
  
