@@ -1,4 +1,6 @@
+import os
 import copy
+import math
 import json
 import time
 import bisect
@@ -10,10 +12,18 @@ from season_data import rank_bracket_team
 from tournament import bracket_generator, double_bracket_generator
 
 with open(f"data/json/teams.json", "r") as j:
-    nba_teams = json.load(j)
+    NBA_TEAMS = json.load(j)
 
 def find_game(team: str, team_bin_pct: dict, team_bins: dict, league_stats: dict, league_bin_pct: dict, league_bins: dict, side_of_ball: str):
     pct = random.random()
+    # for idx in team_bin_pct:
+    #     if pct < team_bin_pct[idx]:
+    #         break
+    # key_value = list(team_bins)[idx]
+    # while len(team_bins[key_value]) == 0:
+    #     key_index -= 1
+    # game = random.choices(team_bins[key_value])[0]
+    # game_stats = league_stats[team][game][side_of_ball]
     team_pct_values = list(team_bin_pct.values())
     if pct > team_pct_values[-1]:
         key_index = len(team_pct_values) - 1
@@ -30,7 +40,8 @@ def find_game(team: str, team_bin_pct: dict, team_bins: dict, league_stats: dict
     return game_stats, game_percentile
 
 def grab_min_max_values_from_games(team: str, season_data: dict, data: dict, side_of_ball: str):
-    teams = [team] if team != 'ALL' else nba_teams
+    teams = [team] if team != 'ALL' else NBA_TEAMS
+    is_all = team
     min_value = float('inf')
     max_value = float('-inf')
     for team in teams:
@@ -42,17 +53,18 @@ def grab_min_max_values_from_games(team: str, season_data: dict, data: dict, sid
                 min_value = game_value
             if game_value > max_value:
                 max_value = game_value
-            if teams == "ALL":
+            if is_all == "ALL":
                 data[f"{team}-{game}"] = game_value
             else:
                 data[game] = game_value
     return round(min_value, 3), round(max_value, 3)
 
 def calculate_histogram_data(data: dict, max_value: float, min_value: float):
-    sqrt_bins = int(len(data) ** 0.5)
+    # amount_of_bins = math.ceil(math.log2(len(data)) + 1)
+    amount_of_bins = math.ceil(2 * (len(data) ** (1/3)))
     difference = max_value - min_value
-    bin_size = difference / sqrt_bins
-    return sqrt_bins, bin_size
+    bin_size = difference / amount_of_bins
+    return amount_of_bins, bin_size
 
 def calculate_bins(min_value: float, sqrt_bins: int, bin_size: int, data: dict,):
     bins = {}
@@ -87,18 +99,24 @@ def bin_games(team: str, season_data: dict, side_of_ball: str):
     return calculate_bins(min_value, sqrt_bins, bin_size, data)
 
 def simulation_game_stats(off_stats: dict, off_stats_pct: float, def_stats: dict, def_stats_pct: float):
-    return_stats = {}
-    for key in off_stats:
-        if key in {'%', 'FP', 'GmSc', 'STRS', 'PTS', 'FGM', 'FGA', 'TRB', 'MP'}: 
-            continue
-        return_stats[key] = int(round((off_stats[key] + def_stats[key]) / 2, 0))
-    return_stats['PTS'] = return_stats['2PM'] * 2 + return_stats['3PM'] * 3 + return_stats['FTM']
-    return_stats['TRB'] = return_stats['ORB'] + return_stats['DRB']
-    return_stats['FGM'] = return_stats['2PM'] + return_stats['3PM']
-    return_stats['FGA'] = return_stats['2PA'] + return_stats['3PA']
-    return return_stats
+    pct = random.random()
+    total_pct = off_stats_pct + def_stats_pct
+    new_off_pct = off_stats_pct / total_pct
+    if pct < new_off_pct:
+        return off_stats
+    return def_stats
+    # return_stats = {}
+    # for key in off_stats:
+    #     if key in {'%', 'FP', 'GmSc', 'STRS', 'PTS', 'FGM', 'FGA', 'TRB', 'MP'}: 
+    #         continue
+    #     return_stats[key] = int(round((off_stats[key] + def_stats[key]) / 2, 0))
+    # return_stats['PTS'] = return_stats['2PM'] * 2 + return_stats['3PM'] * 3 + return_stats['FTM']
+    # return_stats['TRB'] = return_stats['ORB'] + return_stats['DRB']
+    # return_stats['FGM'] = return_stats['2PM'] + return_stats['3PM']
+    # return_stats['FGA'] = return_stats['2PA'] + return_stats['3PA']
+    # return return_stats
 
-def simulate_game(team1: str, year1: str, league_type1: str, team2: str, year2: str, league_type2: str, team1_list = None, team2_list = None, opened = False, results = None, idx = None):
+def simulate_game(team1: str, year1: str, league_type1: str, team2: str, year2: str, league_type2: str, team1_list = None, team2_list = None, opened = False, results = None, idx = None, team1_file = None, team2_file = None):
     if not opened:
         file_league1_type = league_type1.replace('.', '')
         file_league2_type = league_type2.replace('.', '')
@@ -109,7 +127,7 @@ def simulate_game(team1: str, year1: str, league_type1: str, team2: str, year2: 
         team1_bin_def_pct, team1_bins_def = bin_games(team1, team1_stats, 'defense')
         with open(f"data/pickle/{year2} NBA Team Stats {file_league2_type}.pickle", "rb") as pkl:
             team2_stats = pickle.load(pkl)
-        team2_league_bin_pct, team2_league_bins = bin_games('ALL', team1_stats, 'offense')
+        team2_league_bin_pct, team2_league_bins = bin_games('ALL', team2_stats, 'offense')
         team2_bin_off_pct, team2_bins_off = bin_games(team2, team2_stats, 'offense')
         team2_bin_def_pct, team2_bins_def = bin_games(team2, team2_stats, 'defense')
     else:
@@ -160,14 +178,20 @@ def best_of(team1: str, year1: str, league_type1: str, team2: str, year2: str, l
     half_point = round(games / 2, 0)
     team1_total_stats = {}
     team2_total_stats = {}
-    team1_key = f"{team1}-{year1}-{league_type1}"
-    league1_key = f"{year1}-{league_type1}"
-    team1_list = [league_sim_stats[league1_key]['league_bins']['pct'], league_sim_stats[league1_key]['league_bins']['stats'], teams_sim_stats[team1_key]['off']['pct'], teams_sim_stats[team1_key]['off']['stats'], teams_sim_stats[team1_key]['def']['pct'], teams_sim_stats[team1_key]['def']['stats'], league_sim_stats[league1_key]['league']]
-    team2_key = f"{team2}-{year2}-{league_type2}"
-    league2_key = f"{year2}-{league_type2}"
-    team2_list = [league_sim_stats[league2_key]['league_bins']['pct'], league_sim_stats[league2_key]['league_bins']['stats'], teams_sim_stats[team2_key]['off']['pct'], teams_sim_stats[team2_key]['off']['stats'], teams_sim_stats[team2_key]['def']['pct'], teams_sim_stats[team2_key]['def']['stats'], league_sim_stats[league2_key]['league']]
+    team1_file = []
+    team2_file = []
+    if league_sim_stats != None:
+        team1_key = f"{team1}-{year1}-{league_type1}"
+        league1_key = f"{year1}-{league_type1}"
+        team2_key = f"{team2}-{year2}-{league_type2}"
+        league2_key = f"{year2}-{league_type2}"
+        team1_list = [league_sim_stats[league1_key]['league_bins']['pct'], league_sim_stats[league1_key]['league_bins']['stats'], teams_sim_stats[team1_key]['off']['pct'], teams_sim_stats[team1_key]['off']['stats'], teams_sim_stats[team1_key]['def']['pct'], teams_sim_stats[team1_key]['def']['stats'], league_sim_stats[league1_key]['league']]
+        team2_list = [league_sim_stats[league2_key]['league_bins']['pct'], league_sim_stats[league2_key]['league_bins']['stats'], teams_sim_stats[team2_key]['off']['pct'], teams_sim_stats[team2_key]['off']['stats'], teams_sim_stats[team2_key]['def']['pct'], teams_sim_stats[team2_key]['def']['stats'], league_sim_stats[league2_key]['league']]
     for _ in range(games):
-        team1_game_stats, team2_game_stats = simulate_game(team1, year1, league_type1, team2, year2, league_type2, team1_list, team2_list, True)
+        if league_sim_stats != None:
+            team1_game_stats, team2_game_stats = simulate_game(team1, year1, league_type1, team2, year2, league_type2, team1_list, team2_list, True, None, None, team1_file, team2_file)
+        else:
+            team1_game_stats, team2_game_stats = simulate_game(team1, year1, league_type1, team2, year2, league_type2)
         update_stats_dict(team1_total_stats, team1_game_stats)
         update_stats_dict(team2_total_stats, team2_game_stats)
         if team1_game_stats['PTS'] > team2_game_stats['PTS']:
@@ -187,7 +211,7 @@ def update_stats_dict(team_tot_stats: dict, team_game_stats: dict):
         else:
             team_tot_stats[key] += team_game_stats[key]
 
-def run_sim_in_parallel(edit_bracket: dict, round_id: int, winners: list, losers: list, games_to_simulate, teams_sim_stats, league_sin_stats, playoff_stats, return_dict):
+def run_sim_in_parallel(edit_bracket: dict, round_id: int, winners: list, losers: list, games_to_simulate: int, teams_sim_stats: dict, league_sin_stats: dict, playoff_stats: dict, return_dict: dict, double_elim = False, win_or_lose = None):
     threads = []
     results = []
     with concurrent.futures.ProcessPoolExecutor() as executor:
@@ -216,14 +240,17 @@ def run_sim_in_parallel(edit_bracket: dict, round_id: int, winners: list, losers
             if away_key not in playoff_stats:
                 playoff_stats[away_key] = {'offense': {}, 'defense': {}, 'record': {'wins': 0, 'losses': 0, 'best_round': 0}, 'info': {'name': away_team[0], 'year': away_team[1], 'league_type': away_team[2]}}
             two_team_update_dict(home_key, away_key, home_team, away_team, home_team_stats, away_team_stats, playoff_stats)
-            win_year, lose_year = check_round_winner(home_key, away_key, home_team, away_team, wins_dict, edit_bracket, playoff_stats, winners, losers, round_id, game_id)
+            win_year, lose_year = check_round_winner(home_key, away_key, home_team, away_team, wins_dict, edit_bracket, playoff_stats, winners, losers, round_id, game_id, win_or_lose)
             wins_key = f"{home_team[0]}'{home_team[1]}"
             playoff_stats[home_key]['record']['wins'] += wins_dict[wins_key]['wins']
             playoff_stats[home_key]['record']['losses'] += wins_dict[wins_key]['losses']
             playoff_stats[away_key]['record']['losses'] += wins_dict[wins_key]['wins']
             playoff_stats[away_key]['record']['wins'] += wins_dict[wins_key]['losses']
-            return_dict[round_id][game_id] = {'winner': winners[-1][0][0], 'winner_year': win_year, 'wins': max(wins_dict[wins_key]['wins'], wins_dict[wins_key]['losses']), 'loser': losers[-1], 'loser_year': lose_year, 'losses': min(wins_dict[wins_key]['wins'], wins_dict[wins_key]['losses'])}
-        
+            if not double_elim:
+                return_dict[round_id][game_id] = {'winner': winners[-1][0][0], 'winner_year': win_year, 'wins': max(wins_dict[wins_key]['wins'], wins_dict[wins_key]['losses']), 'loser': losers[-1], 'loser_year': lose_year, 'losses': min(wins_dict[wins_key]['wins'], wins_dict[wins_key]['losses'])}
+            else:
+                return_dict[win_or_lose][round_id][game_id] = {'winner': winners[-1][0][0], 'winner_year': win_year, 'winner_league_type': winners[-1][0][2], 'wins': max(wins_dict[wins_key]['wins'], wins_dict[wins_key]['losses']), 'loser': losers[-1], 'loser_year': lose_year, 'losses': min(wins_dict[wins_key]['wins'], wins_dict[wins_key]['losses'])}
+
 def run_single_thread(edit_bracket: dict, round_id: str, winners: list, losers: list, games_to_simulate: int, teams_sim_stats: dict, league_sim_stats: dict, playoff_stats: dict, return_dict: dict, double_elim = False, win_or_lose = None):
     for game_id in edit_bracket[round_id]:
         game = edit_bracket[round_id][game_id]
@@ -240,9 +267,10 @@ def run_single_thread(edit_bracket: dict, round_id: str, winners: list, losers: 
         playoff_stats[away_key]['record']['losses'] += wins_dict[wins_key]['wins']
         playoff_stats[away_key]['record']['wins'] += wins_dict[wins_key]['losses']
         if not double_elim:
-            return_dict[round_id][game_id] = {'winner': winners[-1][0][0], 'winner_year': win_year, 'wins': max(wins_dict[wins_key]['wins'], wins_dict[wins_key]['losses']), 'loser': losers[-1], 'loser_year': lose_year, 'losses': min(wins_dict[wins_key]['wins'], wins_dict[wins_key]['losses'])}
+            return_dict[round_id][game_id] = {'winner': winners[-1][0][0], 'winner_year': win_year, 'winner_league_type': winners[-1][0][2], 'wins': max(wins_dict[wins_key]['wins'], wins_dict[wins_key]['losses']), 'loser': losers[-1], 'loser_year': lose_year, 'losses': min(wins_dict[wins_key]['wins'], wins_dict[wins_key]['losses'])}
         else:
             return_dict[win_or_lose][round_id][game_id] = {'winner': winners[-1][0][0], 'winner_year': win_year, 'winner_league_type': winners[-1][0][2], 'wins': max(wins_dict[wins_key]['wins'], wins_dict[wins_key]['losses']), 'loser': losers[-1], 'loser_year': lose_year, 'losses': min(wins_dict[wins_key]['wins'], wins_dict[wins_key]['losses'])}
+
 def simulate_bracket(teams: list, bracket: dict[list], games_to_simulate: int):
     playoff_stats = {}
     return_dict = {}
@@ -355,18 +383,19 @@ def simulate_double_elimination_bracket(teams: list, winners_bracket: dict, lose
                 else:
                     simulate_loser = True
                     change_top_bracket = False
+    return return_dict, playoff_stats
 
 def simulate_games(games_to_simulate: int, round_id: str, winners: list, losers: list, edit_bracket: dict, teams_sim_stats: dict, league_sim_stats: dict, playoff_stats: dict, return_dict: dict, double_elim = False, win_or_lose = None):
     if games_to_simulate <= 4500:
         run_single_thread(edit_bracket, round_id, winners, losers, games_to_simulate, teams_sim_stats, league_sim_stats, playoff_stats, return_dict, double_elim, win_or_lose)
     elif games_to_simulate >= 10000:
         if len(edit_bracket[round_id]) > 1:
-            run_sim_in_parallel(edit_bracket, round_id, winners, losers, games_to_simulate, teams_sim_stats, league_sim_stats, playoff_stats, return_dict)
+            run_sim_in_parallel(edit_bracket, round_id, winners, losers, games_to_simulate, teams_sim_stats, league_sim_stats, playoff_stats, return_dict, double_elim, win_or_lose)
         else:
             run_single_thread(edit_bracket, round_id, winners, losers, games_to_simulate, teams_sim_stats, league_sim_stats, playoff_stats, return_dict, double_elim, win_or_lose)
     else:
         if len(edit_bracket[round_id]) > 16: 
-            run_sim_in_parallel(edit_bracket, round_id, winners, losers, games_to_simulate, teams_sim_stats, league_sim_stats, playoff_stats, return_dict)
+            run_sim_in_parallel(edit_bracket, round_id, winners, losers, games_to_simulate, teams_sim_stats, league_sim_stats, playoff_stats, return_dict, double_elim, win_or_lose)
         else:
             run_single_thread(edit_bracket, round_id, winners, losers, games_to_simulate, teams_sim_stats, league_sim_stats, playoff_stats, return_dict, double_elim, win_or_lose)
 
@@ -449,7 +478,7 @@ def check_round_winner(home_key: str, away_key: str, home_team: list, away_team:
             playoff_stats[home_key]['record']['best_round'] = round_id
             playoff_stats[away_key]['record']['best_round'] = round_id
         if win_or_lose == None:
-            game_string = f"The home team: {away_team[0]}'{away_team[1]} {away_team[2]}, with {wins_dict[wins_key]['losses']} wins and the away team: {home_team[0]}'{home_team[1]} {home_team[2]}, with {wins_dict[wins_key]['wins']} in {round_id}\n"
+            game_string = f"The away team: {away_team[0]}'{away_team[1]} {away_team[2]}, with {wins_dict[wins_key]['losses']} wins and the home team: {home_team[0]}'{home_team[1]} {home_team[2]}, with {wins_dict[wins_key]['wins']} in {round_id}\n"
         else:
             game_string = f"The away team: {away_team[0]}'{away_team[1]} {away_team[2]}, with {wins_dict[wins_key]['losses']} wins and the home team: {home_team[0]}'{home_team[1]} {home_team[2]}, with {wins_dict[wins_key]['wins']} in {round_id} {win_or_lose}\n"
     print(game_string)
@@ -479,27 +508,73 @@ def multi_bracket_sim(teams: list, amount_of_bracket_sims: int, series_length: i
 
 if __name__ == '__main__':
     teams = [
-        ['GSW', '2016-17', '1.0'],
-        ['SAS', '2015-16', '1.0'],
-        ['GSW', '2014-15', '1.0'],
-        ['BOS', '2023-24', '1.0'],
-        ['GSW', '2015-16', '1.0'],
-        ['BOS', '2007-08', '1.0'],
-        ['GSW', '2017-18', '1.0'],
-        ['CLE', '2008-09', '1.0'],
-        ['SAS', '2013-14', '1.0'],
-        ['MIL', '2018-19', '1.0'],
-        ['SAS', '2004-05', '1.0'],
-        ['UTA', '2007-08', '1.0'],
-        ['MIA', '2012-13', '1.0'],
-        ['OKC', '2012-13', '1.0'],
-        ['DET', '2007-08', '1.0'],
-        ['SAS', '2003-04', '1.0'],
+        ['NOP', '2023-24', '0.0'],
+        ['DEN', '2023-24', '0.0']
     ]
-    print(len(teams))
-    games = 4500
-    winners, losers = double_bracket_generator(teams)
-    simulate_double_elimination_bracket(teams, winners, losers, games)
-   
-            
+    bracket = bracket_generator(len(teams), teams)
+    games = 300_000
+    for _ in range(5):
+        a, b = simulate_bracket(teams, bracket, games)
+    # year = '2023-24'
+    # league_type = '0.0'
+    # team1 = 'DEN'
+    # year1 = year
+    # league_type1 = league_type
+    # team2 = 'NOP'
+    # year2 = year
+    # league_type2 = league_type
+    # games = 30000
+    # home_team = [team1, year1, league_type1]
+    # away_team = [team2, year2, league_type2]
+    # win_dict = {'home_team': 0, 'away_team': 0}
+    
+    # # home_team1 = [team1, year1, league_type1]
+    # # home_team2 = [team2, year2, league_type2]
+    # # away_team1 = [team1, year1, league_type1]
+    # # away_team2 = [team2, year2, league_type2]
+    
+    # # file_league_type = home_team1[2].replace('.', '')
+    # # with open(f"data/pickle/{home_team1[1]} NBA Team Stats {file_league_type}.pickle", "rb") as pkl:
+    # #     home1_team_pickle_stats = pickle.load(pkl)
+    # # home1_team_off_bin_pct, home1_team_off_bins = bin_games(home_team1[0], home1_team_pickle_stats, 'offense')
+    # # home1_team_def_bin_pct, home1_team_def_bins = bin_games(home_team1[0], home1_team_pickle_stats, 'defense')
+    # # home1_team_league_bin_pct, home1_team_league_bins = bin_games('ALL', home1_team_pickle_stats, 'offense')
+
+    # # file_league_type = away_team1[2].replace('.', '')
+    # # with open(f"data/pickle/{away_team1[1]} NBA Team Stats {file_league_type}.pickle", "rb") as pkl:
+    # #     away1_team_pickle_stats = pickle.load(pkl)
+    # # away1_team_off_bin_pct, away1_team_off_bins = bin_games(away_team1[0], away1_team_pickle_stats, 'offense')
+    # # away1_team_def_bin_pct, away1_team_def_bins = bin_games(away_team1[0], away1_team_pickle_stats, 'defense')
+    # # away1_team_league_bin_pct, away1_team_league_bins = bin_games('ALL', away1_team_pickle_stats, 'offense')
+    # # try:
+    # #     assert home1_team_off_bin_pct == away1_team_off_bin_pct
+    # #     assert home1_team_def_bin_pct == away1_team_def_bin_pct
+    # #     assert home1_team_league_bin_pct == away1_team_league_bin_pct
+    # #     assert home1_team_off_bins == away1_team_off_bins
+    # #     assert home1_team_def_bins == away1_team_def_bins
+    # #     assert home1_team_league_bins == away1_team_league_bins
+    # # except:
+    # #     print("ur wrong")
+    
+
+    # a = 0
+    # if a == 1:
+    #     inter_team = home_team
+    #     home_team = away_team
+    #     away_team = inter_team
+    
+    # # ---------------------------------------------------------
+    # # making the hometeam hisotrgram data
+    # file_league_type = home_team[2].replace('.', '')
+    # with open(f"data/pickle/{home_team[1]} NBA Team Stats {file_league_type}.pickle", "rb") as pkl:
+    #     home_team_pickle_stats = pickle.load(pkl)
+    # home_team_off_bin_pct, home_team_off_bins = bin_games(home_team[0], home_team_pickle_stats, 'offense')
+    # home_team_def_bin_pct, home_team_def_bins = bin_games(home_team[0], home_team_pickle_stats, 'defense')
+    # home_team_league_bin_pct, home_team_league_bins = bin_games('ALL', home_team_pickle_stats, 'offense')
+
+    # file_start = "den_histo.pickle"
+    # with open(file_start, "wb") as j:
+        # pickle.dump(home_team_pickle_stats, j)
+
+    
  

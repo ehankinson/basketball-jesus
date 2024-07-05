@@ -5,9 +5,9 @@ import pandas as pd
 import streamlit as st
 from PIL import Image
 sys.path.append('..')
-from simulations import simulate_bracket, multi_bracket_sim
+from simulations import simulate_bracket, multi_bracket_sim, simulate_double_elimination_bracket
 from season_data import rank_custon_teams, rank_bracket_team
-from tournament import bracket_generator
+from tournament import bracket_generator, double_bracket_generator
 from website import NBA_TEAMS
 
 LEAGUE_TYPES = ["0.0", "0.1", "1.0", "1.1", "2.0", "2.1", "3.0", "3.1", "4.0"]
@@ -217,117 +217,231 @@ if n_teams != "":
             st.session_state['team_list'][key] = [NBA_TEAMS[st.session_state[key]['team']]['abr'], st.session_state[key]['year'], st.session_state[key]['league_type']]
     st.divider()
 
-    single_bracket, bracket_statistics, buff, buff, buff, buff  = st.columns(6)
+    single_bracket, double_elimination, bracket_statistics, buff, buff, buff  = st.columns(6)
 
-    sing_brack_or_brack_statistics = None
+    simulated_type = None
     with single_bracket:
         if st.button("Simulate the Bracket"):
-            sing_brack_or_brack_statistics = True
+            simulated_type = 'single'
             with st.spinner("The Games Are Being Simulated"):
                 bracket = bracket_generator(int(n_teams), list(st.session_state['team_list'].values()))
                 game_strings, playoff_stats = simulate_bracket(st.session_state['team_list'], bracket, int(series_max))
+    with double_elimination:
+        if st.button("Simulate with Losers Bracket"):
+            simulated_type = 'double'
+            with st.spinner("The Games Are Being Simulated"):
+                winner, loser = double_bracket_generator(list(st.session_state['team_list'].values()))
+                game_strings, playoff_stats = simulate_double_elimination_bracket(st.session_state['team_list'], winner, loser, int(series_max))
     with bracket_statistics:
         if 'run_multi_braacket' not in st.session_state:
             st.session_state['run_multi_braacket'] = False
         if st.button("Run Bracket Multiple Times Statistics") or st.session_state['run_multi_braacket']:
             st.session_state['run_multi_braacket'] = True
-            sing_brack_or_brack_statistics = False
             amount_of_bracket_simulations = st.text_input("Amount of Times to Simulate the Bracket")
             bracket_stats = None
             if amount_of_bracket_simulations != "":
                 with st.spinner("The Games Are Being Simulated"):
+                    simulated_type = 'single_stats'
                     bracket_stats = multi_bracket_sim(list(st.session_state['team_list'].values()), int(amount_of_bracket_simulations), int(series_max))
                     st.session_state['run_multi_braacket'] = False
 
-    if sing_brack_or_brack_statistics and sing_brack_or_brack_statistics != None:
-        if len(game_strings) > 1:
-            sorted_keys = sorted(list(game_strings.keys()), key=lambda x: int(x[5:]))
-        else:
-            sorted_keys = list(game_strings.keys())
-        x = len(sorted_keys)
-        new_keys = []
-        while x > 0:
-            new_keys.append(sorted_keys[x - 1])
-            x -= 1
-        for idx, round_id in enumerate(new_keys):
-            games_in_round = len(game_strings[round_id])
-            match games_in_round:
-                case 1:
-                    st.header(f"Finals")
-                case 2:
-                    st.header(f"Conference Finals")
-                case 4:
-                    st.header(f"Conference Semi-Finals")
-                case _ if games_in_round > 4:
-                    st.header(f"Round - {idx}")
-            for game in game_strings[round_id]:
-                home_team = game_strings[round_id][game]['loser'][0]
-                home_year = game_strings[round_id][game]['loser_year']
-                away_team = game_strings[round_id][game]['winner']
-                away_year = game_strings[round_id][game]['winner_year']
-                away_logo, away_pts, middle, home_pts, home_logo = st.columns(5)
-                photo_size = 135
-                with away_logo:
-                    resized_image = resize_image(photos[NBA_TEAMS[away_team]['team']], photo_size)
-                    st.image(resized_image, caption=f"{away_team}-{away_year}")
-                with away_pts:
-                    add = game_strings[round_id][game]['wins']
-                    st.markdown(f"""
-                        <div style="display: flex; justify-content: center;">
-                            <div>
-                                <p>&nbsp;</p>  <!-- Empty paragraph to create vertical space -->
-                                <p style="font-size: 55px;">{add}</p>
+    
+    match simulated_type:
+        case None:
+            a = None
+        case "single":
+            if len(game_strings) > 1:
+                sorted_keys = sorted(list(game_strings.keys()), key=lambda x: int(x[5:]))
+            else:
+                sorted_keys = list(game_strings.keys())
+            x = len(sorted_keys)
+            new_keys = []
+            while x > 0:
+                new_keys.append(sorted_keys[x - 1])
+                x -= 1
+            for idx, round_id in enumerate(new_keys):
+                games_in_round = len(game_strings[round_id])
+                match games_in_round:
+                    case 1:
+                        st.header(f"Finals")
+                    case 2:
+                        st.header(f"Conference Finals")
+                    case 4:
+                        st.header(f"Conference Semi-Finals")
+                    case _ if games_in_round > 4:
+                        st.header(f"Round - {idx}")
+                for game in game_strings[round_id]:
+                    home_team = game_strings[round_id][game]['loser'][0]
+                    home_year = game_strings[round_id][game]['loser_year']
+                    away_team = game_strings[round_id][game]['winner']
+                    away_year = game_strings[round_id][game]['winner_year']
+                    away_logo, away_pts, middle, home_pts, home_logo = st.columns(5)
+                    photo_size = 135
+                    with away_logo:
+                        resized_image = resize_image(photos[NBA_TEAMS[away_team]['team']], photo_size)
+                        st.image(resized_image, caption=f"{away_team}-{away_year}")
+                    with away_pts:
+                        add = game_strings[round_id][game]['wins']
+                        st.markdown(f"""
+                            <div style="display: flex; justify-content: center;">
+                                <div>
+                                    <p>&nbsp;</p>  <!-- Empty paragraph to create vertical space -->
+                                    <p style="font-size: 55px;">{add}</p>
+                                </div>
                             </div>
-                        </div>
-                    """, unsafe_allow_html=True)
-                with middle:
-                    st.markdown(f"""
-                        <div style="display: flex; justify-content: center;">
-                            <div>
-                                <p>&nbsp;</p>  <!-- Empty paragraph to create vertical space -->
-                                <p style="font-size: 55px;">-</p>
+                        """, unsafe_allow_html=True)
+                    with middle:
+                        st.markdown(f"""
+                            <div style="display: flex; justify-content: center;">
+                                <div>
+                                    <p>&nbsp;</p>  <!-- Empty paragraph to create vertical space -->
+                                    <p style="font-size: 55px;">-</p>
+                                </div>
                             </div>
-                        </div>
-                    """, unsafe_allow_html=True)
-                with home_pts:
-                    add = game_strings[round_id][game]['losses']
-                    st.markdown(f"""
-                        <div style="display: flex; justify-content: center;">
-                            <div>
-                                <p>&nbsp;</p>  <!-- Empty paragraph to create vertical space -->
-                                <p style="font-size: 55px;">{add}</p>
+                        """, unsafe_allow_html=True)
+                    with home_pts:
+                        add = game_strings[round_id][game]['losses']
+                        st.markdown(f"""
+                            <div style="display: flex; justify-content: center;">
+                                <div>
+                                    <p>&nbsp;</p>  <!-- Empty paragraph to create vertical space -->
+                                    <p style="font-size: 55px;">{add}</p>
+                                </div>
                             </div>
-                        </div>
-                    """, unsafe_allow_html=True)
-                with home_logo:
-                    resized_image = resize_image(photos[NBA_TEAMS[home_team]['team']], photo_size)
-                    st.image(resized_image, caption=f"{home_team}-{home_year}")
+                        """, unsafe_allow_html=True)
+                    with home_logo:
+                        resized_image = resize_image(photos[NBA_TEAMS[home_team]['team']], photo_size)
+                        st.image(resized_image, caption=f"{home_team}-{home_year}")
+                st.divider()
+            st.header("Team Stats")
+            ranked_playoff_teams = rank_bracket_team(playoff_stats)
+            columns = ['Rank', 'Teams', 'Year', 'GP', 'Wins', 'Losses', 'Pct', 'STRS', 'SORS','SDRS', 'PF', 'PA', 'DIFF', 'FP For', 'FP Againts', 'Diff', 'Off GmSc', 'Def GmSc', 'Game Score Diff']
+            df = pd.DataFrame(ranked_playoff_teams, columns=columns)
+            st.dataframe(df, hide_index=True, height=1015)
             st.divider()
-        st.header("Team Stats")
-        ranked_playoff_teams = rank_bracket_team(playoff_stats)
-        columns = ['Rank', 'Teams', 'Year', 'GP', 'Wins', 'Losses', 'Pct', 'STRS', 'SORS','SDRS', 'PF', 'PA', 'DIFF', 'FP For', 'FP Againts', 'Diff', 'Off GmSc', 'Def GmSc', 'Game Score Diff']
-        df = pd.DataFrame(ranked_playoff_teams, columns=columns)
-        # df = df[display_columns]
-        st.dataframe(df, hide_index=True, height=1015)
-        st.divider()
-    elif sing_brack_or_brack_statistics != None and not sing_brack_or_brack_statistics:
-        header = ['Team', 'Year', 'League_Type']
-        power_list = []
-        amount_of_rounds = math.ceil(math.log2(len(st.session_state['team_list'])))
-        rounds = [i + 1 for i in range(amount_of_rounds + 1)]
-        rounds.sort(reverse=True)
-        for round_id in rounds:
-            header.append(str(round_id))
-        for team in bracket_stats:
-            add_list = [NBA_TEAMS[team['name']]['team'], team['year'], team['league_type']]
-            for round_id in rounds:
-                if round_id not in team:
-                    add_list.append("0.0%")
+        case 'double':
+            if len(game_strings['winner']) > 1:
+                sorted_winner_keys = sorted(list(game_strings['winner'].keys()), key=lambda x: int(x[5:]))
+                sorted_winner_keys = sorted_winner_keys[::-1]
+            else:
+                sorted_winner_keys = list(game_strings['winner'].keys())
+            if len(game_strings['loser']) > 1:
+                sorted_loser_keys = sorted(list(game_strings['loser'].keys()), key=lambda x: int(x[5:]))
+                sorted_loser_keys = sorted_loser_keys[::-1]
+            else:
+                sorted_loser_keys = list(game_strings['loser'].keys())
+            
+            winner_count, loser_count, total_count = 0, 0, 0
+            use_losers = True
+            while winner_count < len(sorted_winner_keys) or loser_count < len(sorted_loser_keys):
+                if total_count == 0:
+                    st.header('Grand Finals')
+                    bracket_version = 'grand_finals'
+                    games_to_check = game_strings[bracket_version]
                 else:
-                    add_list.append(f"{round((team[round_id] / int(amount_of_bracket_simulations) * 100), 3)}%")
-            power_list.append(add_list)
-        sorted_power_list = sorted(power_list, key=lambda x: (float(x[3].replace("%", "")), float(x[4].replace("%", "")), float(x[5].replace("%", ""))), reverse=True)
-        df = pd.DataFrame(sorted_power_list, columns=header)
-        st.title("Table of round percentages")
-        st.dataframe(df, hide_index=True, height=1015)
-        st.divider()
+                    if use_losers:
+                        round_id = sorted_loser_keys[loser_count]
+                        games_in_round = len(game_strings['loser'][round_id])
+                        if games_in_round == 1:
+                            if loser_count == 0:
+                                st.header("Losers Grand Finals")
+                            elif loser_count >= 1:
+                                st.header("Losers Finals")
+                        else:
+                            st.header(f"Losers Round {round_id[-1]}")
+                        games_to_check = game_strings['loser'][round_id]
+                        loser_count += 1
+                        if loser_count > 1 and len(sorted_loser_keys) > 2:
+                            if loser_count % 2 == 0 and loser_count != len(sorted_loser_keys):
+                                use_losers = True
+                            else:
+                                use_losers = False
+                        else:
+                            use_losers = False
+                    else:
+                        round_id = sorted_winner_keys[winner_count]
+                        games_in_round = len(game_strings['winner'][round_id])
+                        match games_in_round:
+                            case 1:
+                                st.header("Winners Finals")
+                            case 2:
+                                st.header("Winners Semi-Finals")
+                            case 4:
+                                st.header(f"Winners Quarter Semi-Finals")
+                            case _ if games_in_round > 4:
+                                st.header(f"Winners Round {round_id[-1]}")
+                        games_to_check = game_strings['winner'][round_id]
+                        winner_count += 1
+                        use_losers = True
+                for game in games_to_check:
+                    home_team = games_to_check[game]['loser'][0]
+                    home_year = games_to_check[game]['loser_year']
+                    away_team = games_to_check[game]['winner']
+                    away_year = games_to_check[game]['winner_year']
+                    away_logo, away_pts, middle, home_pts, home_logo = st.columns(5)
+                    photo_size = 135
+                    with away_logo:
+                        resized_image = resize_image(photos[NBA_TEAMS[away_team]['team']], photo_size)
+                        st.image(resized_image, caption=f"{away_team}-{away_year}")
+                    with away_pts:
+                        add = games_to_check[game]['wins']
+                        st.markdown(f"""
+                            <div style="display: flex; justify-content: center;">
+                                <div>
+                                    <p>&nbsp;</p>  <!-- Empty paragraph to create vertical space -->
+                                    <p style="font-size: 55px;">{add}</p>
+                                </div>
+                            </div>
+                        """, unsafe_allow_html=True)
+                    with middle:
+                        st.markdown(f"""
+                            <div style="display: flex; justify-content: center;">
+                                <div>
+                                    <p>&nbsp;</p>  <!-- Empty paragraph to create vertical space -->
+                                    <p style="font-size: 55px;">-</p>
+                                </div>
+                            </div>
+                        """, unsafe_allow_html=True)
+                    with home_pts:
+                        add = games_to_check[game]['losses']
+                        st.markdown(f"""
+                            <div style="display: flex; justify-content: center;">
+                                <div>
+                                    <p>&nbsp;</p>  <!-- Empty paragraph to create vertical space -->
+                                    <p style="font-size: 55px;">{add}</p>
+                                </div>
+                            </div>
+                        """, unsafe_allow_html=True)
+                    with home_logo:
+                        resized_image = resize_image(photos[NBA_TEAMS[home_team]['team']], photo_size)
+                        st.image(resized_image, caption=f"{home_team}-{home_year}")
+                total_count += 1
+            st.divider()
+            st.header("Team Stats")
+            ranked_playoff_teams = rank_bracket_team(playoff_stats)
+            columns = ['Rank', 'Teams', 'Year', 'GP', 'Wins', 'Losses', 'Pct', 'STRS', 'SORS','SDRS', 'PF', 'PA', 'DIFF', 'FP For', 'FP Againts', 'Diff', 'Off GmSc', 'Def GmSc', 'Game Score Diff']
+            df = pd.DataFrame(ranked_playoff_teams, columns=columns)
+            st.dataframe(df, hide_index=True, height=1015)
+            st.divider()
+
+        case "single_stats":
+            header = ['Team', 'Year', 'League_Type']
+            power_list = []
+            amount_of_rounds = math.ceil(math.log2(len(st.session_state['team_list'])))
+            rounds = [i + 1 for i in range(amount_of_rounds + 1)]
+            rounds.sort(reverse=True)
+            for round_id in rounds:
+                header.append(str(round_id))
+            for team in bracket_stats:
+                add_list = [NBA_TEAMS[team['name']]['team'], team['year'], team['league_type']]
+                for round_id in rounds:
+                    if round_id not in team:
+                        add_list.append("0.0%")
+                    else:
+                        add_list.append(f"{round((team[round_id] / int(amount_of_bracket_simulations) * 100), 3)}%")
+                power_list.append(add_list)
+            sorted_power_list = sorted(power_list, key=lambda x: (float(x[3].replace("%", "")), float(x[4].replace("%", "")), float(x[5].replace("%", ""))), reverse=True)
+            df = pd.DataFrame(sorted_power_list, columns=header)
+            st.title("Table of round percentages")
+            st.dataframe(df, hide_index=True, height=1015)
+            st.divider()

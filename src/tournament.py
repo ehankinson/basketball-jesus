@@ -3,7 +3,10 @@ import random
 
 
 def bracket_generator(number_of_teams: int, team_list: list):
-    amount_of_rounds = math.ceil(math.log2(number_of_teams))
+    if round(math.log2(number_of_teams)) < math.ceil(math.log2(number_of_teams)):
+        amount_of_rounds = round(math.log2(number_of_teams))
+    else:
+        amount_of_rounds = math.ceil(math.log2(number_of_teams))
     remainder = (2 ** amount_of_rounds) - number_of_teams
     playoff_rounds = {'round1': {}}
     if remainder > 0:
@@ -21,6 +24,15 @@ def bracket_generator(number_of_teams: int, team_list: list):
             playoff_rounds[key][round_ids] = [team_list[idx], previous]
             round_ids += 1
             sub += 1
+    elif remainder < 0:
+        amounts_of_teams = remainder * -2
+        end_idx = len(team_list) - 1
+        test_start_idx = int(end_idx - (amounts_of_teams) / 2)
+        while test_start_idx < end_idx:
+            playoff_rounds['round1'] = [team_list[test_start_idx], team_list[end_idx]]
+            test_start_idx += 1
+            end_idx -= 1
+        start_idx = 0
     else:
         start_idx = 0
     end_idx = number_of_teams - 1
